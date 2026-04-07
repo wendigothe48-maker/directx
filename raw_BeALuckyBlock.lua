@@ -6,6 +6,22 @@ KeySystem.Init()
 -- [[ GAME SCRIPT START ]] --
 local cloneref = (cloneref or clonereference or function(instance) return instance end)
 local ReplicatedStorage = cloneref(game:GetService("ReplicatedStorage"))
+local UserInputService = cloneref(game:GetService("UserInputService"))
+
+local function detectDevice()
+    if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
+        print("Device Detected: Mobile")
+        return true
+    elseif UserInputService.KeyboardEnabled then
+        print("Device Detected: PC")
+        return false
+    else
+        print("Device Detected: Other/Console")
+        return false
+    end
+end
+
+local isMobileDevice = detectDevice()
 
 local WindUI
 local ok, result = pcall(function()
@@ -214,10 +230,8 @@ Tabs.Farming:Button({
     Title = "Collect Cash",
     Desc = "Collects cash from all containers in your plot",
     Callback = function()
-        print("[CollectCash] Searching for plot...")
         local plot = getPlayerPlot()
         if plot and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            print("[CollectCash] Plot found. Checking containers...")
             local containers = plot:FindFirstChild("Containers")
             if containers then
                 local collectedAny = false
@@ -229,16 +243,16 @@ Tabs.Farming:Button({
                             if collection then
                                 local collectionPad = collection:FindFirstChild("CollectionPad")
                                 if collectionPad and firetouchinterest then
-                                    print("[CollectCash] Firing touch for container: " .. container.Name)
                                     firetouchinterest(collectionPad, LocalPlayer.Character.HumanoidRootPart, 0)
+                                    if isMobileDevice then
+                                        task.wait(0.05)
+                                        firetouchinterest(collectionPad, LocalPlayer.Character.HumanoidRootPart, 1)
+                                    end
                                     collectedAny = true
                                 end
                             end
                         end
                     end
-                end
-                if not collectedAny then
-                    print("[CollectCash] No collectable containers found.")
                 end
             end
         end
@@ -253,7 +267,6 @@ Tabs.Farming:Toggle({
     Callback = function(Value)
         autoCollectEnabled = Value
         if Value then
-            print("[AutoCollect] Started.")
             task.spawn(function()
                 while autoCollectEnabled do
                     local plot = getPlayerPlot()
@@ -269,24 +282,21 @@ Tabs.Farming:Toggle({
                                         if collection then
                                             local collectionPad = collection:FindFirstChild("CollectionPad")
                                             if collectionPad and firetouchinterest then
-                                                print("[AutoCollect] Firing touch for container: " .. container.Name)
                                                 firetouchinterest(collectionPad, LocalPlayer.Character.HumanoidRootPart, 0)
+                                                if isMobileDevice then
+                                                    task.wait(0.05)
+                                                    firetouchinterest(collectionPad, LocalPlayer.Character.HumanoidRootPart, 1)
+                                                end
                                                 collectedAny = true
                                             end
                                         end
                                     end
                                 end
                             end
-                            if not collectedAny then
-                                print("[AutoCollect] No collectable containers found this cycle.")
-                            end
                         end
-                    else
-                        print("[AutoCollect] Plot or Character not found.")
                     end
                     task.wait(1)
                 end
-                print("[AutoCollect] Stopped.")
             end)
         end
     end
@@ -300,7 +310,6 @@ Tabs.Farming:Toggle({
     Callback = function(Value)
         autoUpgradeEnabled = Value
         if Value then
-            print("[Brainrot] Auto Upgrade Started.")
             task.spawn(function()
                 while autoUpgradeEnabled do
                     local plot = getPlayerPlot()
@@ -326,7 +335,6 @@ Tabs.Farming:Toggle({
                                                         if cost and getPlayerCash() >= cost then
                                                             local containerNum = container.Name
                                                             if containerNum then
-                                                                print("[Brainrot] Upgrading container " .. containerNum .. " for " .. costText)
                                                                 local args = { containerNum }
                                                                 pcall(function()
                                                                     game:GetService("ReplicatedStorage"):WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("sleitnick_knit@1.7.0"):WaitForChild("knit"):WaitForChild("Services"):WaitForChild("ContainerService"):WaitForChild("RF"):WaitForChild("UpgradeBrainrot"):InvokeServer(unpack(args))
@@ -336,8 +344,6 @@ Tabs.Farming:Toggle({
                                                         end
                                                     end
                                                 end
-                                            else
-                                                print("[Brainrot] Ignored container " .. container.Name .. " (No brainrot inside)")
                                             end
                                         end
                                     end
@@ -347,7 +353,6 @@ Tabs.Farming:Toggle({
                     end
                     task.wait(0.5) -- Faster main loop
                 end
-                print("[Brainrot] Auto Upgrade Stopped.")
             end)
         end
     end
@@ -355,8 +360,8 @@ Tabs.Farming:Toggle({
 
 local autoUpgradeMSEnabled = false
 Tabs.Farming:Toggle({
-    Title = "Auto Upgrade Movement Speed",
-    Desc = "Automatically upgrades your movement speed",
+    Title = "Auto Buy Movement Speed",
+    Desc = "Automatically buys movement speed upgrades",
     Value = false,
     Callback = function(Value)
         autoUpgradeMSEnabled = Value
@@ -370,7 +375,6 @@ Tabs.Farming:Toggle({
                             local costText = string.gsub(cashLabel.Text, "[%$%s]", "")
                             local cost = NumberConverter and NumberConverter.Parse(costText) or tonumber(costText)
                             if cost and getPlayerCash() >= cost then
-                                print("[MovementSpeed] Upgrading for " .. costText)
                                 local args = { "MovementSpeed", 4 }
                                 game:GetService("ReplicatedStorage"):WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("sleitnick_knit@1.7.0"):WaitForChild("knit"):WaitForChild("Services"):WaitForChild("UpgradesService"):WaitForChild("RF"):WaitForChild("Upgrade"):InvokeServer(unpack(args))
                             end
@@ -391,11 +395,9 @@ Tabs.Farming:Toggle({
     Callback = function(Value)
         autoBuyLuckyBlock = Value
         if Value then
-            print("[LuckyBlock] Auto Buy Started.")
             task.spawn(function()
                 while autoBuyLuckyBlock do
                     pcall(function()
-                        print("[LuckyBlock] Scanning shop items...")
                         local scrollingFrame = LocalPlayer.PlayerGui.Windows.PickaxeShop.ShopContainer.ScrollingFrame
                         local ignoreList = {}
                         
@@ -406,12 +408,10 @@ Tabs.Farming:Toggle({
                                     ignoreList[child.Name] = true
                                     local baseName = string.gsub(child.Name, "_event$", "")
                                     ignoreList[baseName] = true
-                                    print("[LuckyBlock] Ignored event item: " .. child.Name)
                                 end
                                 local rebirthRq = child:FindFirstChild("RebirthRq")
                                 if rebirthRq and rebirthRq.Visible then
                                     ignoreList[child.Name] = true
-                                    print("[LuckyBlock] Ignored locked item (RebirthRq): " .. child.Name)
                                 end
                             end
                         end
@@ -439,7 +439,6 @@ Tabs.Farming:Toggle({
                                             if isEquipped then
                                                 if not currentEquipped or cost > currentEquipped.price then
                                                     currentEquipped = { name = child.Name, price = cost }
-                                                    print("[LuckyBlock] Currently equipped: " .. child.Name .. " (Value: " .. costText .. ")")
                                                 end
                                             end
                                             
@@ -457,9 +456,7 @@ Tabs.Farming:Toggle({
                         -- Logic to buy/equip
                         if bestItem then
                             if not currentEquipped or bestItem.price > currentEquipped.price then
-                                print("[LuckyBlock] Found better item: " .. bestItem.name .. " (Price: " .. bestItem.price .. ")")
                                 if not bestItem.isPurchased then
-                                    print("[LuckyBlock] Buying " .. bestItem.name .. "...")
                                     -- Try firing the button if possible
                                     if getconnections then
                                         for _, conn in ipairs(getconnections(bestItem.button.MouseButton1Click)) do
@@ -472,7 +469,6 @@ Tabs.Farming:Toggle({
                                 end
                                 
                                 -- Equip
-                                print("[LuckyBlock] Equipping " .. bestItem.name .. "...")
                                 if getconnections and bestItem.equipBtn then
                                     for _, conn in ipairs(getconnections(bestItem.equipBtn.MouseButton1Click)) do
                                         pcall(function() conn.Function() end)
@@ -480,16 +476,11 @@ Tabs.Farming:Toggle({
                                 end
                                 local args = { bestItem.name }
                                 pcall(function() game:GetService("ReplicatedStorage"):WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("sleitnick_knit@1.7.0"):WaitForChild("knit"):WaitForChild("Services"):WaitForChild("SkinService"):WaitForChild("RF"):WaitForChild("EquipSkin"):InvokeServer(unpack(args)) end)
-                            else
-                                print("[LuckyBlock] Already have the best affordable item equipped.")
                             end
-                        else
-                            print("[LuckyBlock] No affordable items found.")
                         end
                     end)
                     task.wait(1)
                 end
-                print("[LuckyBlock] Auto Buy Stopped.")
             end)
         end
     end
@@ -503,20 +494,17 @@ Tabs.Farming:Toggle({
     Callback = function(Value)
         autoRebirthEnabled = Value
         if Value then
-            print("[AutoRebirth] Started.")
             task.spawn(function()
                 while autoRebirthEnabled do
                     pcall(function()
                         local progress = LocalPlayer.PlayerGui.Windows.Rebirth.Bar.Progress
                         if progress and progress.Size.X.Scale >= 1 then
-                            print("[AutoRebirth] Progress full, rebirthing...")
                             game:GetService("ReplicatedStorage"):WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("sleitnick_knit@1.7.0"):WaitForChild("knit"):WaitForChild("Services"):WaitForChild("RebirthService"):WaitForChild("RF"):WaitForChild("Rebirth"):InvokeServer()
                             task.wait(2) -- Wait a bit after rebirthing
                         end
                     end)
                     task.wait(1)
                 end
-                print("[AutoRebirth] Stopped.")
             end)
         end
     end
