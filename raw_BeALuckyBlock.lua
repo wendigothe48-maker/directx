@@ -168,16 +168,11 @@ local function removeObstacles()
             end
         end
     end
-    
-    local bossTouchDetectors = workspace:FindFirstChild("BossTouchDetectors")
-    if bossTouchDetectors then
-        bossTouchDetectors:Destroy()
-    end
 end
 
 Tabs.Farming:Button({
     Title = "Remove Obstacles",
-    Desc = "Remove Bases Boss and Disable Boss Hits",
+    Desc = "Remove Bases Boss",
     Callback = function()
         removeObstacles()
     end
@@ -346,7 +341,7 @@ Tabs.Farming:Toggle({
                                                 local buyMax = gui:FindFirstChild("BuyMax")
                                                 if buyMax then
                                                     local cashLabel = buyMax:FindFirstChild("Cash")
-                                                    if cashLabel and cashLabel:IsA("TextLabel") then
+                                                    if cashLabel and cashLabel:IsA("TextLabel") and cashLabel.Visible then
                                                         local costText = string.gsub(cashLabel.Text, "[%$%s]", "")
                                                         local cost = NumberConverter and NumberConverter.Parse(costText) or tonumber(costText)
                                                         
