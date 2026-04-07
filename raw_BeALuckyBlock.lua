@@ -10,13 +10,10 @@ local UserInputService = cloneref(game:GetService("UserInputService"))
 
 local function detectDevice()
     if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
-        print("Device Detected: Mobile")
         return true
     elseif UserInputService.KeyboardEnabled then
-        print("Device Detected: PC")
         return false
     else
-        print("Device Detected: Other/Console")
         return false
     end
 end
@@ -226,35 +223,81 @@ Tabs.Farming:Toggle({
     end
 })
 
-Tabs.Farming:Button({
-    Title = "Collect Cash",
-    Desc = "Collects cash from all containers in your plot",
-    Callback = function()
-        local plot = getPlayerPlot()
-        if plot and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            local containers = plot:FindFirstChild("Containers")
-            if containers then
-                local collectedAny = false
-                for _, containerGroup in ipairs(containers:GetChildren()) do
-                    for _, container in ipairs(containerGroup:GetChildren()) do
-                        local innerModel = container:FindFirstChild("InnerModel")
-                        if innerModel and #innerModel:GetChildren() > 0 then
-                            local collection = container:FindFirstChild("Collection")
-                            if collection then
-                                local collectionPad = collection:FindFirstChild("CollectionPad")
-                                if collectionPad and firetouchinterest then
-                                    firetouchinterest(collectionPad, LocalPlayer.Character.HumanoidRootPart, 0)
-                                    if isMobileDevice then
-                                        task.wait(0.05)
-                                        firetouchinterest(collectionPad, LocalPlayer.Character.HumanoidRootPart, 1)
-                                    end
-                                    collectedAny = true
-                                end
+local isCollectingCash = false
+
+local function collectCashSmoothly()
+    if isCollectingCash then return end
+    isCollectingCash = true
+
+    local plot = getPlayerPlot()
+    if plot and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local containers = plot:FindFirstChild("Containers")
+        if containers then
+            local pads = {}
+            for _, containerGroup in ipairs(containers:GetChildren()) do
+                for _, container in ipairs(containerGroup:GetChildren()) do
+                    local innerModel = container:FindFirstChild("InnerModel")
+                    if innerModel and #innerModel:GetChildren() > 0 then
+                        local collection = container:FindFirstChild("Collection")
+                        if collection then
+                            local collectionPad = collection:FindFirstChild("CollectionPad")
+                            if collectionPad then
+                                table.insert(pads, collectionPad)
                             end
                         end
                     end
                 end
             end
+
+            local totalPads = #pads
+            if totalPads > 0 then
+                -- Spread the collection over 5 seconds to prevent lag
+                local targetDuration = 5
+                local waitTime = targetDuration / totalPads
+                local batchSize = 1
+                
+                -- task.wait() minimum is ~0.03. If waitTime is too small, process in batches.
+                if waitTime < 0.03 then
+                    batchSize = math.ceil(0.03 / waitTime)
+                    waitTime = 0.03
+                end
+
+                for i, collectionPad in ipairs(pads) do
+                    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then break end
+                    
+                    if firetouchinterest then
+                        firetouchinterest(collectionPad, LocalPlayer.Character.HumanoidRootPart, 0)
+                        if isMobileDevice then
+                            task.delay(0.05, function()
+                                firetouchinterest(collectionPad, LocalPlayer.Character.HumanoidRootPart, 1)
+                            end)
+                        end
+                    end
+                    
+                    -- Yield to prevent lag
+                    if i % batchSize == 0 then
+                        task.wait(waitTime)
+                    end
+                end
+            else
+                task.wait(5) -- Wait 5s if no pads found
+            end
+        else
+            task.wait(5) -- Wait 5s if no containers found
+        end
+    else
+        task.wait(5) -- Wait 5s if no plot/character found
+    end
+
+    isCollectingCash = false
+end
+
+Tabs.Farming:Button({
+    Title = "Collect Cash",
+    Desc = "Collects cash smoothly over 5 seconds (No Lag)",
+    Callback = function()
+        if not isCollectingCash then
+            task.spawn(collectCashSmoothly)
         end
     end
 })
@@ -262,40 +305,15 @@ Tabs.Farming:Button({
 local autoCollectEnabled = false
 Tabs.Farming:Toggle({
     Title = "Auto Collect Cash",
-    Desc = "Automatically collects cash from containers",
+    Desc = "Automatically collects cash smoothly (No Lag)",
     Value = false,
     Callback = function(Value)
         autoCollectEnabled = Value
         if Value then
             task.spawn(function()
                 while autoCollectEnabled do
-                    local plot = getPlayerPlot()
-                    if plot and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                        local containers = plot:FindFirstChild("Containers")
-                        if containers then
-                            local collectedAny = false
-                            for _, containerGroup in ipairs(containers:GetChildren()) do
-                                for _, container in ipairs(containerGroup:GetChildren()) do
-                                    local innerModel = container:FindFirstChild("InnerModel")
-                                    if innerModel and #innerModel:GetChildren() > 0 then
-                                        local collection = container:FindFirstChild("Collection")
-                                        if collection then
-                                            local collectionPad = collection:FindFirstChild("CollectionPad")
-                                            if collectionPad and firetouchinterest then
-                                                firetouchinterest(collectionPad, LocalPlayer.Character.HumanoidRootPart, 0)
-                                                if isMobileDevice then
-                                                    task.wait(0.05)
-                                                    firetouchinterest(collectionPad, LocalPlayer.Character.HumanoidRootPart, 1)
-                                                end
-                                                collectedAny = true
-                                            end
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                    end
-                    task.wait(1)
+                    collectCashSmoothly()
+                    task.wait(0.5)
                 end
             end)
         end
