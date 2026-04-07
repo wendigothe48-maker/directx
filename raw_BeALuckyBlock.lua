@@ -93,7 +93,13 @@ local LocalPlayer = Players.LocalPlayer
 local function getPlayerCash()
     local leaderstats = LocalPlayer:FindFirstChild("leaderstats")
     if leaderstats and leaderstats:FindFirstChild("Cash") then
-        return leaderstats.Cash.Value
+        local val = leaderstats.Cash.Value
+        if type(val) == "string" then
+            local cleanStr = string.gsub(val, "[%$%s]", "")
+            local parsed = NumberConverter and NumberConverter.Parse(cleanStr) or tonumber(cleanStr)
+            return parsed or 0
+        end
+        return val
     end
     return 0
 end
@@ -158,6 +164,7 @@ end
 
 Tabs.Farming:Button({
     Title = "Remove Obstacles",
+    Desc = "Remove Bases Boss and Disable Boss Hits",
     Callback = function()
         removeObstacles()
     end
@@ -166,6 +173,7 @@ Tabs.Farming:Button({
 local autoFarmEnabled = false
 Tabs.Farming:Toggle({
     Title = "Auto Farm",
+    Desc = "Automatically opens highest lucky block and teleports to plot",
     Value = false,
     Callback = function(Value)
         autoFarmEnabled = Value
@@ -204,22 +212,33 @@ Tabs.Farming:Toggle({
 
 Tabs.Farming:Button({
     Title = "Collect Cash",
+    Desc = "Collects cash from all containers in your plot",
     Callback = function()
+        print("[CollectCash] Searching for plot...")
         local plot = getPlayerPlot()
         if plot and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            print("[CollectCash] Plot found. Checking containers...")
             local containers = plot:FindFirstChild("Containers")
             if containers then
-                for _, container in ipairs(containers:GetChildren()) do
-                    local innerModel = container:FindFirstChild("InnerModel")
-                    if innerModel and #innerModel:GetChildren() > 0 then
-                        local collection = container:FindFirstChild("Collection")
-                        if collection then
-                            local collectionPad = collection:FindFirstChild("CollectionPad")
-                            if collectionPad and firetouchinterest then
-                                firetouchinterest(collectionPad, LocalPlayer.Character.HumanoidRootPart, 0)
+                local collectedAny = false
+                for _, containerGroup in ipairs(containers:GetChildren()) do
+                    for _, container in ipairs(containerGroup:GetChildren()) do
+                        local innerModel = container:FindFirstChild("InnerModel")
+                        if innerModel and #innerModel:GetChildren() > 0 then
+                            local collection = container:FindFirstChild("Collection")
+                            if collection then
+                                local collectionPad = collection:FindFirstChild("CollectionPad")
+                                if collectionPad and firetouchinterest then
+                                    print("[CollectCash] Firing touch for container: " .. container.Name)
+                                    firetouchinterest(collectionPad, LocalPlayer.Character.HumanoidRootPart, 0)
+                                    collectedAny = true
+                                end
                             end
                         end
                     end
+                end
+                if not collectedAny then
+                    print("[CollectCash] No collectable containers found.")
                 end
             end
         end
@@ -229,32 +248,45 @@ Tabs.Farming:Button({
 local autoCollectEnabled = false
 Tabs.Farming:Toggle({
     Title = "Auto Collect Cash",
+    Desc = "Automatically collects cash from containers",
     Value = false,
     Callback = function(Value)
         autoCollectEnabled = Value
         if Value then
+            print("[AutoCollect] Started.")
             task.spawn(function()
                 while autoCollectEnabled do
                     local plot = getPlayerPlot()
                     if plot and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
                         local containers = plot:FindFirstChild("Containers")
                         if containers then
-                            for _, container in ipairs(containers:GetChildren()) do
-                                local innerModel = container:FindFirstChild("InnerModel")
-                                if innerModel and #innerModel:GetChildren() > 0 then
-                                    local collection = container:FindFirstChild("Collection")
-                                    if collection then
-                                        local collectionPad = collection:FindFirstChild("CollectionPad")
-                                        if collectionPad and firetouchinterest then
-                                            firetouchinterest(collectionPad, LocalPlayer.Character.HumanoidRootPart, 0)
+                            local collectedAny = false
+                            for _, containerGroup in ipairs(containers:GetChildren()) do
+                                for _, container in ipairs(containerGroup:GetChildren()) do
+                                    local innerModel = container:FindFirstChild("InnerModel")
+                                    if innerModel and #innerModel:GetChildren() > 0 then
+                                        local collection = container:FindFirstChild("Collection")
+                                        if collection then
+                                            local collectionPad = collection:FindFirstChild("CollectionPad")
+                                            if collectionPad and firetouchinterest then
+                                                print("[AutoCollect] Firing touch for container: " .. container.Name)
+                                                firetouchinterest(collectionPad, LocalPlayer.Character.HumanoidRootPart, 0)
+                                                collectedAny = true
+                                            end
                                         end
                                     end
                                 end
                             end
+                            if not collectedAny then
+                                print("[AutoCollect] No collectable containers found this cycle.")
+                            end
                         end
+                    else
+                        print("[AutoCollect] Plot or Character not found.")
                     end
                     task.wait(1)
                 end
+                print("[AutoCollect] Stopped.")
             end)
         end
     end
@@ -263,10 +295,12 @@ Tabs.Farming:Toggle({
 local autoUpgradeEnabled = false
 Tabs.Farming:Toggle({
     Title = "Auto Upgrade Brainrot",
+    Desc = "Automatically upgrades brainrot in your containers",
     Value = false,
     Callback = function(Value)
         autoUpgradeEnabled = Value
         if Value then
+            print("[Brainrot] Auto Upgrade Started.")
             task.spawn(function()
                 while autoUpgradeEnabled do
                     local plot = getPlayerPlot()
@@ -297,7 +331,7 @@ Tabs.Farming:Toggle({
                                                                 pcall(function()
                                                                     game:GetService("ReplicatedStorage"):WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("sleitnick_knit@1.7.0"):WaitForChild("knit"):WaitForChild("Services"):WaitForChild("ContainerService"):WaitForChild("RF"):WaitForChild("UpgradeBrainrot"):InvokeServer(unpack(args))
                                                                 end)
-                                                                task.wait(0.5)
+                                                                task.wait(0.1) -- Fast speed
                                                             end
                                                         end
                                                     end
@@ -311,8 +345,9 @@ Tabs.Farming:Toggle({
                             end
                         end
                     end
-                    task.wait(2)
+                    task.wait(0.5) -- Faster main loop
                 end
+                print("[Brainrot] Auto Upgrade Stopped.")
             end)
         end
     end
@@ -321,6 +356,7 @@ Tabs.Farming:Toggle({
 local autoUpgradeMSEnabled = false
 Tabs.Farming:Toggle({
     Title = "Auto Upgrade Movement Speed",
+    Desc = "Automatically upgrades your movement speed",
     Value = false,
     Callback = function(Value)
         autoUpgradeMSEnabled = Value
@@ -350,13 +386,16 @@ Tabs.Farming:Toggle({
 local autoBuyLuckyBlock = false
 Tabs.Farming:Toggle({
     Title = "Auto Buy Best Lucky Block",
+    Desc = "Automatically buys and equips the best affordable lucky block",
     Value = false,
     Callback = function(Value)
         autoBuyLuckyBlock = Value
         if Value then
+            print("[LuckyBlock] Auto Buy Started.")
             task.spawn(function()
                 while autoBuyLuckyBlock do
                     pcall(function()
+                        print("[LuckyBlock] Scanning shop items...")
                         local scrollingFrame = LocalPlayer.PlayerGui.Windows.PickaxeShop.ShopContainer.ScrollingFrame
                         local ignoreList = {}
                         
@@ -367,6 +406,12 @@ Tabs.Farming:Toggle({
                                     ignoreList[child.Name] = true
                                     local baseName = string.gsub(child.Name, "_event$", "")
                                     ignoreList[baseName] = true
+                                    print("[LuckyBlock] Ignored event item: " .. child.Name)
+                                end
+                                local rebirthRq = child:FindFirstChild("RebirthRq")
+                                if rebirthRq and rebirthRq.Visible then
+                                    ignoreList[child.Name] = true
+                                    print("[LuckyBlock] Ignored locked item (RebirthRq): " .. child.Name)
                                 end
                             end
                         end
@@ -394,6 +439,7 @@ Tabs.Farming:Toggle({
                                             if isEquipped then
                                                 if not currentEquipped or cost > currentEquipped.price then
                                                     currentEquipped = { name = child.Name, price = cost }
+                                                    print("[LuckyBlock] Currently equipped: " .. child.Name .. " (Value: " .. costText .. ")")
                                                 end
                                             end
                                             
@@ -411,34 +457,66 @@ Tabs.Farming:Toggle({
                         -- Logic to buy/equip
                         if bestItem then
                             if not currentEquipped or bestItem.price > currentEquipped.price then
-                                print("[LuckyBlock] Upgrading to " .. bestItem.name)
+                                print("[LuckyBlock] Found better item: " .. bestItem.name .. " (Price: " .. bestItem.price .. ")")
                                 if not bestItem.isPurchased then
+                                    print("[LuckyBlock] Buying " .. bestItem.name .. "...")
                                     -- Try firing the button if possible
                                     if getconnections then
                                         for _, conn in ipairs(getconnections(bestItem.button.MouseButton1Click)) do
                                             pcall(function() conn.Function() end)
                                         end
                                     end
-                                    -- Fallback to remote guess
+                                    -- Exact remote provided by user
                                     local args = { bestItem.name }
-                                    pcall(function() game:GetService("ReplicatedStorage"):WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("sleitnick_knit@1.7.0"):WaitForChild("knit"):WaitForChild("Services"):WaitForChild("PickaxeService"):WaitForChild("RF"):WaitForChild("BuyPickaxe"):InvokeServer(unpack(args)) end)
-                                    pcall(function() game:GetService("ReplicatedStorage"):WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("sleitnick_knit@1.7.0"):WaitForChild("knit"):WaitForChild("Services"):WaitForChild("PickaxeService"):WaitForChild("RF"):WaitForChild("Buy"):InvokeServer(unpack(args)) end)
+                                    pcall(function() game:GetService("ReplicatedStorage"):WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("sleitnick_knit@1.7.0"):WaitForChild("knit"):WaitForChild("Services"):WaitForChild("SkinService"):WaitForChild("RF"):WaitForChild("BuySkin"):InvokeServer(unpack(args)) end)
                                 end
                                 
                                 -- Equip
+                                print("[LuckyBlock] Equipping " .. bestItem.name .. "...")
                                 if getconnections and bestItem.equipBtn then
                                     for _, conn in ipairs(getconnections(bestItem.equipBtn.MouseButton1Click)) do
                                         pcall(function() conn.Function() end)
                                     end
                                 end
                                 local args = { bestItem.name }
-                                pcall(function() game:GetService("ReplicatedStorage"):WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("sleitnick_knit@1.7.0"):WaitForChild("knit"):WaitForChild("Services"):WaitForChild("PickaxeService"):WaitForChild("RF"):WaitForChild("EquipPickaxe"):InvokeServer(unpack(args)) end)
-                                pcall(function() game:GetService("ReplicatedStorage"):WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("sleitnick_knit@1.7.0"):WaitForChild("knit"):WaitForChild("Services"):WaitForChild("PickaxeService"):WaitForChild("RF"):WaitForChild("Equip"):InvokeServer(unpack(args)) end)
+                                pcall(function() game:GetService("ReplicatedStorage"):WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("sleitnick_knit@1.7.0"):WaitForChild("knit"):WaitForChild("Services"):WaitForChild("SkinService"):WaitForChild("RF"):WaitForChild("EquipSkin"):InvokeServer(unpack(args)) end)
+                            else
+                                print("[LuckyBlock] Already have the best affordable item equipped.")
                             end
+                        else
+                            print("[LuckyBlock] No affordable items found.")
                         end
                     end)
                     task.wait(1)
                 end
+                print("[LuckyBlock] Auto Buy Stopped.")
+            end)
+        end
+    end
+})
+
+local autoRebirthEnabled = false
+Tabs.Farming:Toggle({
+    Title = "Auto Rebirth",
+    Desc = "Automatically rebirths when progress bar is full",
+    Value = false,
+    Callback = function(Value)
+        autoRebirthEnabled = Value
+        if Value then
+            print("[AutoRebirth] Started.")
+            task.spawn(function()
+                while autoRebirthEnabled do
+                    pcall(function()
+                        local progress = LocalPlayer.PlayerGui.Windows.Rebirth.Bar.Progress
+                        if progress and progress.Size.X.Scale >= 1 then
+                            print("[AutoRebirth] Progress full, rebirthing...")
+                            game:GetService("ReplicatedStorage"):WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("sleitnick_knit@1.7.0"):WaitForChild("knit"):WaitForChild("Services"):WaitForChild("RebirthService"):WaitForChild("RF"):WaitForChild("Rebirth"):InvokeServer()
+                            task.wait(2) -- Wait a bit after rebirthing
+                        end
+                    end)
+                    task.wait(1)
+                end
+                print("[AutoRebirth] Stopped.")
             end)
         end
     end
