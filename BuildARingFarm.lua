@@ -465,16 +465,18 @@ local PickupSection = Tabs.Main:Section({
     Opened = false,
 })
 
-getgenv().pickupDelay = 10
+getgenv().pickupDelay = 2
 PickupSection:Slider({
     Title = "Pickup Delay",
-    Description = "Adjust delay in seconds",
-    Default = 2,
-    Min = 0.5,
-    Max = 10,
-    Step = 0.5,
-    Callback = function(Value)
-        getgenv().pickupDelay = Value
+    Desc = "Adjust delay in seconds",
+    Step = 1,
+    Value = {
+        Min = 1,
+        Max = 100,
+        Default = 2,
+    },
+    Callback = function(value)
+        getgenv().pickupDelay = value
     end
 })
 
@@ -529,7 +531,6 @@ local MainSection = Tabs.Main:Section({
     Box = true,
     BoxBorder = true,
     Opened = true,
-    Scroll = true,
 })
 
 
@@ -994,8 +995,8 @@ AutoBuyGearSection:Toggle({
 
 local EventsHoneySection = Tabs.Events:Section({
     Title = "Auto Farm",
-    Box = false,
-    BoxBorder = false,
+    Box = true,
+    BoxBorder = true,
     Opened = true,
 })
 
@@ -1070,20 +1071,24 @@ WindUI:Notify({
 })
 
 -- ══════════════════════════════════════════
---              SCROLL FIX
+--              SCROLL FIX (Only for game UI)
 -- ══════════════════════════════════════════
 task.spawn(function()
     local function applyScrollFix(container)
         if not container then return end
         for _, obj in ipairs(container:GetDescendants()) do
-            if obj:IsA("ScrollingFrame") then
+            if obj:IsA("ScrollingFrame") and not obj:FindFirstAncestor("PXH_Hub") then
                 obj.AutomaticCanvasSize = Enum.AutomaticSize.Y
                 obj.ScrollingEnabled = true
                 obj.Active = true
-                local layout = obj:FindFirstChildWhichIsA("UIListLayout")
+                local layout = obj:FindFirstChildWhichIsA("UIListLayout") or obj:FindFirstChildWhichIsA("UIGridLayout")
                 if layout then
                     local function update()
-                        obj.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 20)
+                        if layout:IsA("UIListLayout") then
+                            obj.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 20)
+                        elseif layout:IsA("UIGridLayout") then
+                            obj.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 20)
+                        end
                     end
                     layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(update)
                     update()
@@ -1092,19 +1097,15 @@ task.spawn(function()
         end
     end
 
-    local coreGui = game:GetService("CoreGui")
     local playerGui = game:GetService("Players").LocalPlayer:FindFirstChild("PlayerGui")
-
-    applyScrollFix(coreGui)
     if playerGui then applyScrollFix(playerGui) end
 
     local function onChildAdded(child)
-        if child:IsA("ScreenGui") then
+        if child:IsA("ScreenGui") and child.Name == "MainUI" then
             task.wait(0.5)
             applyScrollFix(child)
         end
     end
 
-    coreGui.ChildAdded:Connect(onChildAdded)
     if playerGui then playerGui.ChildAdded:Connect(onChildAdded) end
 end)
