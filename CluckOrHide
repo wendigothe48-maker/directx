@@ -367,7 +367,7 @@ local function manageHelpFeatures()
             end
             
             local selfChar = aliveFolder:FindFirstChild(LocalPlayer.Name) or LocalPlayer.Character
-            if not selfChar then
+            if not selfChar or selfChar:FindFirstChild("KillerHighlight") then
                 task.wait(1)
                 continue
             end
@@ -484,6 +484,26 @@ local killerTrapConnection = nil
 local currentKillerHrp = nil
 local debounceTrap = false
 
+local function doSafeTeleport(localHrp, killerHrp)
+    debounceTrap = true
+    local oldCFrame = localHrp.CFrame
+    localHrp.CFrame = killerHrp.CFrame + Vector3.new(0, 13, 0)
+    
+    task.spawn(function()
+        task.wait(0.5)
+        while currentKillerHrp and currentKillerHrp.Parent and Toggles.KillerIsSafe do
+            if (currentKillerHrp.Position - oldCFrame.Position).Magnitude > 22 then
+                break
+            end
+            task.wait(0.5)
+        end
+        if localHrp and localHrp.Parent and Toggles.KillerIsSafe then
+            localHrp.CFrame = oldCFrame
+        end
+        debounceTrap = false
+    end)
+end
+
 local function manageKillerTrapFeatures()
     if Toggles.KillerIsSafe and featureStates.Main then
         if not killerTrapConnection then
@@ -502,9 +522,7 @@ local function manageKillerTrapFeatures()
                         if hitPlayer == LocalPlayer and hit.Parent ~= currentKillerHrp.Parent then
                             local localHrp = hit.Parent:FindFirstChild("HumanoidRootPart")
                             if localHrp then
-                                debounceTrap = true
-                                localHrp.CFrame = currentKillerHrp.CFrame + Vector3.new(0, 13, 0)
-                                task.delay(0.5, function() debounceTrap = false end)
+                                doSafeTeleport(localHrp, currentKillerHrp)
                             end
                         end
                     end
@@ -534,10 +552,8 @@ local function manageKillerTrapFeatures()
                         local locHrp = locChar:FindFirstChild("HumanoidRootPart")
                         if locHrp and locHrp.Parent ~= currentKillerHrp.Parent and not debounceTrap then
                             local relPos = killerHrp.CFrame:ToObjectSpace(locHrp.CFrame).Position
-                            if math.sqrt(relPos.X^2 + relPos.Z^2) <= 7.5 and math.abs(relPos.Y) <= 11 then
-                                debounceTrap = true
-                                locHrp.CFrame = currentKillerHrp.CFrame + Vector3.new(0, 13, 0)
-                                task.delay(0.5, function() debounceTrap = false end)
+                            if math.sqrt(relPos.X^2 + relPos.Z^2) <= 7.5 and relPos.Y >= -14 and relPos.Y <= 8 then
+                                doSafeTeleport(locHrp, killerHrp)
                             end
                         end
                     end
@@ -562,7 +578,7 @@ local function manageKillerTrapFeatures()
                         local rightDir = rot * Vector3.new(1, 0, 0)
                         local lookDir = rightDir:Cross(upDir).Unit
                         
-                        p.CFrame = killerHrp.CFrame * CFrame.fromMatrix(center, rightDir, upDir, -lookDir)
+                        p.CFrame = killerHrp.CFrame * CFrame.new(0, -3, 0) * CFrame.fromMatrix(center, rightDir, upDir, -lookDir)
                     end
                 else
                     for _, p in ipairs(killerTrapParts) do
@@ -918,7 +934,7 @@ Tabs.Hider:Toggle({
 })
 
 Tabs.Hider:Toggle({
-    Title = "KILLER IS SAFE",
+    Title = "Get away From Killer",
     Desc = "(BUGGY) ! Not Reccomended For Casual Play",
     Value = false,
     Callback = function(state)
