@@ -25,10 +25,13 @@ SupportUI.ResetOnSpawn = false
 
 local camera = workspace.CurrentCamera
 local vpSize = camera and camera.ViewportSize or Vector2.new(1920, 1080)
-local defW = 480
-local defH = 550
-if vpSize.X < 600 then defW = vpSize.X * 0.9 end
-if vpSize.Y < 700 then defH = vpSize.Y * 0.8 end
+local defW = math.clamp(vpSize.X * 0.4, 300, 800) -- Default to 40% of screen width, min 300, max 800
+local defH = defW * 1.15 -- Lock ratio
+
+if vpSize.X < 600 then 
+    defW = vpSize.X * 0.9
+    defH = defW * 1.15
+end
 
 -- The main draggable window
 local MainFrame = Instance.new("Frame")
@@ -37,10 +40,19 @@ MainFrame.Parent = SupportUI
 MainFrame.AnchorPoint = Vector2.new(0.5, 0)
 MainFrame.Position = UDim2.new(0.5, 0, 0.2, 0)
 MainFrame.Size = UDim2.new(0, defW, 0, 0) -- Starts at 0 height for entrance anim
-MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25) -- Slightly lighter for gradient base
+MainFrame.BackgroundTransparency = 0.15 -- Transparent base
 MainFrame.ClipsDescendants = true
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
+
+local MainGradient = Instance.new("UIGradient")
+MainGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(30, 30, 40)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(10, 10, 15))
+})
+MainGradient.Rotation = 90
+MainGradient.Parent = MainFrame
 
 local BgPattern = Instance.new("ImageLabel")
 BgPattern.Parent = MainFrame
@@ -93,10 +105,10 @@ TitleHeader.Parent = Topbar
 TitleHeader.BackgroundTransparency = 1
 TitleHeader.Position = UDim2.new(0, 20, 0, 10)
 TitleHeader.Size = UDim2.new(1, -150, 0, 20)
-TitleHeader.Font = Enum.Font.GothamBold
-TitleHeader.Text = "Support Chat"
+TitleHeader.Font = Enum.Font.GothamBlack -- Changed to Black for heavier bold
+TitleHeader.Text = "Live Support" -- Renamed
 TitleHeader.TextColor3 = Color3.fromRGB(255, 255, 255)
-TitleHeader.TextSize = 16
+TitleHeader.TextSize = 18
 TitleHeader.TextXAlignment = Enum.TextXAlignment.Left
 
 local StatusDot = Instance.new("Frame")
@@ -212,6 +224,7 @@ local InputContainer = Instance.new("Frame")
 InputContainer.Name = "InputContainer"
 InputContainer.Parent = ContentFrame
 InputContainer.BackgroundColor3 = Color3.fromRGB(12, 12, 16)
+InputContainer.BackgroundTransparency = 0.2
 InputContainer.Position = UDim2.new(0, 0, 1, -70)
 InputContainer.Size = UDim2.new(1, 0, 0, 70)
 InputContainer.BorderSizePixel = 0
@@ -251,10 +264,10 @@ TextBox.ClearTextOnFocus = false
 
 local SendBtn = Instance.new("TextButton")
 SendBtn.Parent = InputContainer
-SendBtn.BackgroundColor3 = Color3.fromRGB(249, 115, 22) -- Orange
+SendBtn.BackgroundColor3 = Color3.fromRGB(249, 115, 22) -- Orange base
 SendBtn.Position = UDim2.new(1, -80, 0.5, -20)
 SendBtn.Size = UDim2.new(0, 60, 0, 40)
-SendBtn.Font = Enum.Font.GothamBold
+SendBtn.Font = Enum.Font.GothamBlack
 SendBtn.Text = "SEND"
 SendBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 SendBtn.TextSize = 12
@@ -263,7 +276,14 @@ local SendCorner = Instance.new("UICorner")
 SendCorner.CornerRadius = UDim.new(0, 6)
 SendCorner.Parent = SendBtn
 
-SendBtn.MouseEnter:Connect(function() TweenService:Create(SendBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(251, 146, 60)}):Play() end)
+local SendGradient = Instance.new("UIGradient")
+SendGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(250, 204, 21)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(249, 115, 22))
+})
+SendGradient.Parent = SendBtn
+
+SendBtn.MouseEnter:Connect(function() TweenService:Create(SendBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play() end)
 SendBtn.MouseLeave:Connect(function() TweenService:Create(SendBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(249, 115, 22)}):Play() end)
 
 -- Initial Animation
@@ -325,7 +345,7 @@ local function addMessage(data)
     container.Parent = ChatScroll
     
     local bubble = Instance.new("Frame")
-    bubble.BackgroundColor3 = isAdmin and Color3.fromRGB(20, 20, 30) or Color3.fromRGB(25, 20, 35)
+    bubble.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     bubble.Size = UDim2.new(0, math.max(size.X + 24, 70), 0, size.Y + 34)
     if isAdmin then
         bubble.Position = UDim2.new(0, 0, 0, 0)
@@ -334,6 +354,21 @@ local function addMessage(data)
         bubble.Position = UDim2.new(1, 0, 0, 0)
     end
     bubble.Parent = container
+
+    local bGrad = Instance.new("UIGradient")
+    if isAdmin then
+        bGrad.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 20, 30)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(30, 30, 45))
+        })
+    else
+        bGrad.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(40, 25, 55)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 15, 30))
+        })
+    end
+    bGrad.Rotation = 45
+    bGrad.Parent = bubble
     
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(0, 10)
@@ -527,12 +562,12 @@ local ResizeHandle = Instance.new("TextButton")
 ResizeHandle.Parent = MainFrame
 ResizeHandle.Name = "ResizeHandle"
 ResizeHandle.BackgroundTransparency = 1
-ResizeHandle.Position = UDim2.new(1, -20, 1, -20)
-ResizeHandle.Size = UDim2.new(0, 20, 0, 20)
+ResizeHandle.Position = UDim2.new(1, -30, 1, -30)
+ResizeHandle.Size = UDim2.new(0, 30, 0, 30)
 ResizeHandle.ZIndex = 10
 ResizeHandle.Text = "↘"
-ResizeHandle.TextColor3 = Color3.fromRGB(150, 150, 160)
-ResizeHandle.TextSize = 18
+ResizeHandle.TextColor3 = Color3.fromRGB(200, 200, 210)
+ResizeHandle.TextSize = 24
 ResizeHandle.Font = Enum.Font.GothamBold
 
 local resizing = false
@@ -550,7 +585,7 @@ ResizeHandle.InputBegan:Connect(function(input)
                 resizing = false
                 if not minimized then
                     defW = MainFrame.AbsoluteSize.X
-                    defH = MainFrame.AbsoluteSize.Y
+                    defH = defW * 1.15
                 end
             end
         end)
@@ -561,7 +596,7 @@ UserInputService.InputChanged:Connect(function(input)
     if resizing and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
         local delta = input.Position - rDragStart
         local newW = math.max(300, rStartSize.X + delta.X)
-        local newH = math.max(400, rStartSize.Y + delta.Y)
+        local newH = newW * 1.15
         if not minimized then
             MainFrame.Size = UDim2.new(0, newW, 0, newH)
         end
