@@ -118,10 +118,12 @@ local function click3DButton(buttonPart)
         -- Support for Touch / Mobile as requested by the rule
         local UIS = game:GetService("UserInputService")
         if UIS.TouchEnabled and not UIS.MouseEnabled then
-            local mobileTouchId = 55555
-            VirtualInputManager:SendTouchEvent(mobileTouchId, 0, clickX, clickY)
-            task.wait(0.02)
-            VirtualInputManager:SendTouchEvent(mobileTouchId, 2, clickX, clickY)
+            pcall(function()
+                local VirtualUser = game:GetService("VirtualUser")
+                VirtualUser:Button1Down(Vector2.new(clickX, clickY), workspace.CurrentCamera.CFrame)
+                task.wait(0.05)
+                VirtualUser:Button1Up(Vector2.new(clickX, clickY), workspace.CurrentCamera.CFrame)
+            end)
         else
             VirtualInputManager:SendMouseMoveEvent(clickX, clickY, game)
             task.wait(0.02)
