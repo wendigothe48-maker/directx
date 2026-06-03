@@ -397,8 +397,31 @@ Tabs.Main:Toggle({
     end
 })
 
+local autoWalkOnLavaEnabled = false
+local activeLavaCovers = {}
+
+Tabs.Main:Toggle({
+    Title = "Walk On Lava",
+    Value = false,
+    Callback = function(Value)
+        autoWalkOnLavaEnabled = Value
+    end
+})
+
+local autoNerfTsunamiEnabled = false
+local activeTsunamiCovers = {}
+
+Tabs.Main:Toggle({
+    Title = "Nerf Tsunami",
+    Value = false,
+    Callback = function(Value)
+        autoNerfTsunamiEnabled = Value
+    end
+})
+
 task.spawn(function()
     while task.wait(1) do
+
         if autoBetterBarrierEnabled then
             pcall(function()
                 local mapFolder = workspace:FindFirstChild("Map")
@@ -468,6 +491,84 @@ task.spawn(function()
 end)
 
 game:GetService("RunService").Stepped:Connect(function()
+    if autoWalkOnLavaEnabled then
+        pcall(function()
+            local mapFolder = workspace:FindFirstChild("Map")
+            if mapFolder then
+                for _, mapModule in ipairs(mapFolder:GetChildren()) do
+                    for _, desc in ipairs(mapModule:GetDescendants()) do
+                        if desc:IsA("BasePart") and desc.Name == "RisingLava" then
+                            local cover = activeLavaCovers[desc]
+                            if not cover or not cover.Parent then
+                                cover = Instance.new("Part")
+                                cover.Name = "LavaCover"
+                                cover.Anchored = true
+                                cover.CanCollide = true
+                                cover.Transparency = 1
+                                cover.Parent = desc.Parent
+                                activeLavaCovers[desc] = cover
+                            end
+                            cover.Size = Vector3.new(desc.Size.X, 1, desc.Size.Z)
+                            cover.CFrame = desc.CFrame * CFrame.new(0, desc.Size.Y / 2 + 0.6, 0)
+                        end
+                    end
+                end
+            end
+        end)
+    else
+        for desc, cover in pairs(activeLavaCovers) do
+            if cover and cover.Parent then
+                cover:Destroy()
+            end
+        end
+        table.clear(activeLavaCovers)
+    end
+
+    if autoNerfTsunamiEnabled then
+        pcall(function()
+            local mapFolder = workspace:FindFirstChild("Map")
+            if mapFolder then
+                for _, mapModule in ipairs(mapFolder:GetChildren()) do
+                    for _, desc in ipairs(mapModule:GetDescendants()) do
+                        if desc:IsA("BasePart") and desc.Name == "Tsunami" then
+                            local cover = activeTsunamiCovers[desc]
+                            if not cover or not cover.Parent then
+                                cover = Instance.new("Part")
+                                cover.Name = "TsunamiCover"
+                                cover.Anchored = true
+                                cover.CanCollide = true
+                                cover.Transparency = 1
+                                cover.Parent = desc.Parent
+                                activeTsunamiCovers[desc] = cover
+                            end
+                            cover.Size = desc.Size + Vector3.new(10, 10, 10)
+                            cover.CFrame = desc.CFrame
+                            
+                            local targetPlayer = game.Players.LocalPlayer
+                            local hrp = targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+                            if hrp then
+                                local point = cover.CFrame:PointToObjectSpace(hrp.Position)
+                                local hs = cover.Size / 2
+                                if math.abs(point.X) <= hs.X + 2 and math.abs(point.Y) <= hs.Y + 2 and math.abs(point.Z) <= hs.Z + 2 then
+                                    if point.Y < hs.Y - 2 then
+                                        hrp.CFrame = CFrame.new(hrp.Position.X, cover.Position.Y + hs.Y + 3.5, hrp.Position.Z)
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+    else
+        for desc, cover in pairs(activeTsunamiCovers) do
+            if cover and cover.Parent then
+                cover:Destroy()
+            end
+        end
+        table.clear(activeTsunamiCovers)
+    end
+
     if autoBetterBarrierEnabled then
         local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
         if hrp then
