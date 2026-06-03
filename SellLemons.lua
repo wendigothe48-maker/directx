@@ -75,6 +75,9 @@ local Tabs = {
 local autoLemonsToggle = false
 local autoUpgradeLemonToggle = false
 local autoUpgradeButtonsToggle = false
+local autoCollectCashDropToggle = false
+local autoAcceptPhoneOfferToggle = false
+local raiseOfferTimes = 0
 local upgradeTargetOptions = {}
 local upgradeLemonsDelay = 0.5
 
@@ -209,6 +212,45 @@ Tabs.Main:Toggle({
     end
 })
 
+Tabs.Main:Toggle({
+    Title = "Auto Collect Cash Drop",
+    Desc = "Automatically collect dropped cash",
+    Default = false,
+    Callback = function(state)
+        autoCollectCashDropToggle = state
+    end
+})
+
+local PhoneOfferSection = Tabs.Main:Section({
+    Title = "Auto Accept Phone Offer",
+    Box = true,
+    BoxBorder = true,
+    Expandable = true,
+    Opened = true
+})
+
+PhoneOfferSection:Toggle({
+    Title = "Auto Accept Phone Offer",
+    Desc = "Automatically answers the phone",
+    Default = false,
+    Callback = function(state)
+        autoAcceptPhoneOfferToggle = state
+    end
+})
+
+PhoneOfferSection:Slider({
+    Title = "Raise Offer X Times",
+    Step = 1,
+    Value = {
+        Min = 0,
+        Max = 5,
+        Default = 0,
+    },
+    Callback = function(value)
+        raiseOfferTimes = value
+    end
+})
+
 local availableUpgrades = {}
 local availablePurchases = {}
 
@@ -318,6 +360,62 @@ task.spawn(function()
                         availablePurchases[desc] = nil
                     end
                 end
+            end
+        end
+    end
+end)
+
+task.spawn(function()
+    while task.wait(0.5) do
+        if autoCollectCashDropToggle then
+            local cashDropsFolder = workspace:FindFirstChild("CashDrops")
+            if cashDropsFolder then
+                local lp = game:GetService("Players").LocalPlayer
+                local hrp = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    for _, drop in ipairs(cashDropsFolder:GetChildren()) do
+                        if drop.Name == "CashDrop" and drop:FindFirstChild("TouchInterest") then
+                            if firetouchinterest then
+                                pcall(function()
+                                    firetouchinterest(drop, hrp, 0)
+                                    firetouchinterest(drop, hrp, 1)
+                                end)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
+
+task.spawn(function()
+    local lastPhoneVisible = false
+    while task.wait(0.5) do
+        if autoAcceptPhoneOfferToggle then
+            local lp = game:GetService("Players").LocalPlayer
+            local phoneUi = lp:FindFirstChild("PlayerGui") and lp.PlayerGui:FindFirstChild("Phone") and lp.PlayerGui.Phone:FindFirstChild("Phone")
+            
+            if phoneUi then
+                local isVisible = phoneUi.Visible
+                if isVisible and not lastPhoneVisible then
+                    -- Phone just sprouted up, answer the offer!
+                    task.spawn(function()
+                        local ty = getMyTycoon()
+                        if ty and ty:FindFirstChild("Remotes") and ty.Remotes:FindFirstChild("PhoneOffer") then
+                            local remote = ty.Remotes.PhoneOffer
+                            local raises = math.floor(raiseOfferTimes)
+                            
+                            for i = 1, raises do
+                                pcall(function() remote:FireServer("Raise") end)
+                                task.wait(0.5)
+                            end
+                            
+                            pcall(function() remote:FireServer("Accept") end)
+                        end
+                    end)
+                end
+                lastPhoneVisible = isVisible
             end
         end
     end
