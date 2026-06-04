@@ -107,7 +107,12 @@ local function getPlayerCash()
     return 0
 end
 
+local myCachedPlot = nil
 local function getMyPlot()
+    if myCachedPlot and myCachedPlot.Parent then
+        return myCachedPlot
+    end
+
     local bases = workspace:FindFirstChild("Bases")
     if bases then
         for _, base in ipairs(bases:GetChildren()) do
@@ -121,7 +126,8 @@ local function getMyPlot()
                         if nameObj and (nameObj:IsA("TextLabel") or nameObj:IsA("StringValue") or nameObj:IsA("TextButton")) then
                             local text = nameObj.Text or nameObj.Value
                             if text and text:match(LocalPlayer.Name) then
-                                print("Base Detected:", base.Name)
+                                myCachedPlot = base
+                                print("Successfully Locked your Base:", base.Name)
                                 return base
                             end
                         end
@@ -130,9 +136,15 @@ local function getMyPlot()
             end
         end
     end
-    print("Base Not Detected")
     return nil
 end
+
+task.spawn(function()
+    while not myCachedPlot do
+        getMyPlot()
+        task.wait(1)
+    end
+end)
 
 local AutoBrainrotSection = Tabs.Main:Section({
     Title = "Auto Brainrot",
@@ -142,9 +154,43 @@ local AutoBrainrotSection = Tabs.Main:Section({
     Opened = true
 })
 
+local availableRarities = {}
+pcall(function()
+    local mapWalls = workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("Walls")
+    if mapWalls then
+        for _, child in ipairs(mapWalls:GetChildren()) do
+            if string.lower(string.sub(child.Name, 1, 3)) == "gui" then
+                local surfaceGui = child:FindFirstChild("SurfaceGui")
+                if surfaceGui then
+                    local rarityLabel = surfaceGui:FindFirstChild("Rarity")
+                    if rarityLabel and (rarityLabel:IsA("TextLabel") or (type(rarityLabel) == "userdata" and type(rarityLabel.Text) == "string")) then
+                        local text = rarityLabel.Text
+                        if text and text ~= "" then
+                            local rarityName = string.match(text, "^%s*(%S+)")
+                            if rarityName then
+                                local exists = false
+                                for _, v in ipairs(availableRarities) do
+                                    if v == rarityName then exists = true; break end
+                                end
+                                if not exists then
+                                    table.insert(availableRarities, rarityName)
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
+
+local autoFarmSelectedRarities = {}
+for _, v in ipairs(availableRarities) do
+    table.insert(autoFarmSelectedRarities, v)
+end
+
 local autoFarmBrainrotEnabled = false
 local autoFarmMinMoney = 1
-local autoFarmSlider
 
 AutoBrainrotSection:Toggle({
     Title = "Auto Farm Brainrot",
@@ -181,7 +227,24 @@ AutoBrainrotSection:Toggle({
                                                 textStr = string.gsub(textStr, "[%$%s]", "")
                                                 local money = NumberConverter and NumberConverter.Parse(textStr) or tonumber(textStr)
                                                 
-                                                if money and money >= autoFarmMinMoney and money > highestMoney then
+                                                local passesRarity = false
+                                                local rarityLabel = brainrot["Billboard-Part"].WildCharacterBillboard.MainFrame:FindFirstChild("Rarity")
+                                                if rarityLabel and (rarityLabel:IsA("TextLabel") or (type(rarityLabel) == "userdata" and type(rarityLabel.Text) == "string")) then
+                                                    local rText = rarityLabel.Text
+                                                    if rText then
+                                                        local rName = string.match(rText, "^%s*(%S+)")
+                                                        if rName and type(autoFarmSelectedRarities) == "table" then
+                                                            for _, sel in ipairs(autoFarmSelectedRarities) do
+                                                                if sel == rName then
+                                                                    passesRarity = true
+                                                                    break
+                                                                end
+                                                            end
+                                                        end
+                                                    end
+                                                end
+                                                
+                                                if passesRarity and money and money >= autoFarmMinMoney and money > highestMoney then
                                                     highestMoney = money
                                                     bestTarget = standPrimary
                                                     targetPrompt = prompt
@@ -212,48 +275,46 @@ AutoBrainrotSection:Toggle({
     end
 })
 
-local function formatMapValue(val)
-    local n = math.pow(10, ((val - 1) / 9999) * 12)
-    if n >= 1e12 then
-        return string.format("$%.1fT", n / 1e12), n
-    elseif n >= 1e9 then
-        return string.format("$%.1fB", n / 1e9), n
-    elseif n >= 1e6 then
-        return string.format("$%.1fM", n / 1e6), n
-    elseif n >= 1e3 then
-        return string.format("$%.1fK", n / 1e3), n
-    else
-        return string.format("$%.0f", n), n
-    end
-end
-
-local autoFarmDebounce = 0
-
-autoFarmSlider = AutoBrainrotSection:Slider({
-    Title = "Min Brainrot Money",
-    Desc = "Targeting: $1",
-    Step = 1,
-    Value = {
-        Min = 1,
-        Max = 10000,
-        Default = 1,
-    },
+AutoBrainrotSection:Dropdown({
+    Title = "Target Rarities",
+    Multi = true,
+    Values = availableRarities,
+    Value = autoFarmSelectedRarities,
     Callback = function(Value)
-        local formattedStr, realValue = formatMapValue(Value)
-        autoFarmMinMoney = realValue
+        autoFarmSelectedRarities = Value
+    end
+})
+
+local autoFarmInput = AutoBrainrotSection:Input({
+    Title = "Min Brainrot Money",
+    Desc = "Targeting Multiplier (M, B, T, Qa, Qi, Sx...)",
+    Placeholder = "e.g. 500k, 12M, 5T",
+    Callback = function(text)
+        if text == nil or text == "" then
+            autoFarmMinMoney = 0
+            pcall(function()
+                if autoFarmInput and autoFarmInput.SetDesc then
+                    autoFarmInput:SetDesc("Targeting Multiplier (M, B, T, Qa, Qi, Sx...)")
+                end
+            end)
+            return
+        end
+        local parsed = (NumberConverter and NumberConverter.Parse(text)) or tonumber(text) or 0
+        autoFarmMinMoney = parsed
         
-        autoFarmDebounce = autoFarmDebounce + 1
-        local currentId = autoFarmDebounce
-        
-        task.delay(0.02, function()
-            if currentId == autoFarmDebounce then
-                pcall(function()
-                    if autoFarmSlider and autoFarmSlider.SetDesc then
-                        autoFarmSlider:SetDesc("Targeting: " .. formattedStr)
-                    end
-                end)
+        local formStr = (NumberConverter and NumberConverter.Format(parsed)) or tostring(parsed)
+        local displayStr = "$" .. formStr
+        pcall(function()
+            if autoFarmInput and autoFarmInput.SetDesc then
+                autoFarmInput:SetDesc("Targeting: " .. displayStr)
             end
         end)
+        
+        WindUI:Notify({
+            Title = "Auto Farm Set",
+            Content = displayStr .. " has been set as the minimum brainrot value.",
+            Duration = 3
+        })
     end
 })
 
@@ -358,12 +419,17 @@ AutoBrainrotSection:Toggle({
                                         if priceLabel and (priceLabel:IsA("TextLabel") or (type(priceLabel) == "userdata" and type(priceLabel.Text) == "string")) then
                                             local priceText = string.gsub(priceLabel.Text, "[%$%s]", "")
                                             local price = NumberConverter and NumberConverter.Parse(priceText) or tonumber(priceText)
-                                            if price and getPlayerCash() >= price then
-                                                local spotNum = tonumber(spot.Name)
-                                                if spotNum then
-                                                    local args = { spotNum }
-                                                    game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("upgradeCharacterEvent"):FireServer(unpack(args))
-                                                    task.wait(0.025)
+                                            if price and price > 0 then
+                                                if getPlayerCash() >= price then
+                                                    local spotNum = tonumber(spot.Name)
+                                                    if spotNum then
+                                                        -- Check exactly milli-seconds before firing to ensure no cash overlaps
+                                                        if getPlayerCash() >= price then
+                                                            local args = { spotNum }
+                                                            game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("upgradeCharacterEvent"):FireServer(unpack(args))
+                                                            task.wait(0.05)
+                                                        end
+                                                    end
                                                 end
                                             end
                                         end
@@ -389,35 +455,22 @@ Tabs.Main:Toggle({
             task.spawn(function()
                 while autoBuyStrengthEnabled do
                     pcall(function()
-                        local buttonsFolder = LocalPlayer.PlayerGui.Menus.Upgrades.MainFrame.MainBar["1"].Buttons
-                        local button2 = buttonsFolder:FindFirstChild("Button2")
-                        local button1 = buttonsFolder:FindFirstChild("Button1")
+                        local buttonsFolder = game:GetService("Players").LocalPlayer.PlayerGui.Menus.Upgrades.MainFrame.MainBar["1"].Buttons
+                        local button2Obj = buttonsFolder.Button2:FindFirstChild("TextWhiite") or buttonsFolder.Button2:FindFirstChild("TextWhite")
+                        local cost2Text = string.gsub(button2Obj.Text, "[%$%s]", "")
+                        local cost2 = NumberConverter and NumberConverter.Parse(cost2Text) or tonumber(cost2Text)
                         
-                        local bought = false
-                        if button2 then
-                            local textLabel = button2:FindFirstChild("TextWhiite") or button2:FindFirstChild("TextWhite")
-                            if textLabel and (textLabel:IsA("TextLabel") or (type(textLabel) == "userdata" and type(textLabel.Text) == "string")) then
-                                local costText = string.gsub(textLabel.Text, "[%$%s]", "")
-                                local cost = NumberConverter and NumberConverter.Parse(costText) or tonumber(costText)
-                                
-                                if cost and getPlayerCash() >= cost then
-                                    local args = { 10 }
-                                    game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("buySoloEvent"):FireServer(unpack(args))
-                                    bought = true
-                                end
-                            end
-                        end
-                        
-                        if not bought and button1 then
-                            local textLabel = button1:FindFirstChild("TextWhiite") or button1:FindFirstChild("TextWhite")
-                            if textLabel and (textLabel:IsA("TextLabel") or (type(textLabel) == "userdata" and type(textLabel.Text) == "string")) then
-                                local costText = string.gsub(textLabel.Text, "[%$%s]", "")
-                                local cost = NumberConverter and NumberConverter.Parse(costText) or tonumber(costText)
-                                
-                                if cost and getPlayerCash() >= cost then
-                                    local args = { 1 }
-                                    game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("buySoloEvent"):FireServer(unpack(args))
-                                end
+                        if cost2 and getPlayerCash() >= cost2 then
+                            local args = { 10 }
+                            game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("buySoloEvent"):FireServer(unpack(args))
+                        else
+                            local button1Obj = buttonsFolder.Button1:FindFirstChild("TextWhiite") or buttonsFolder.Button1:FindFirstChild("TextWhite")
+                            local cost1Text = string.gsub(button1Obj.Text, "[%$%s]", "")
+                            local cost1 = NumberConverter and NumberConverter.Parse(cost1Text) or tonumber(cost1Text)
+                            
+                            if cost1 and getPlayerCash() >= cost1 then
+                                local args = { 1 }
+                                game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("buySoloEvent"):FireServer(unpack(args))
                             end
                         end
                     end)
@@ -425,6 +478,48 @@ Tabs.Main:Toggle({
                 end
             end)
         end
+    end
+})
+
+local autoRebirthEnabled = false
+Tabs.Main:Toggle({
+    Title = "Auto Rebirth",
+    Value = false,
+    Callback = function(Value)
+        autoRebirthEnabled = Value
+        if Value then
+            task.spawn(function()
+                while autoRebirthEnabled do
+                    pcall(function()
+                        local greenBar = game:GetService("Players").LocalPlayer.PlayerGui.Menus.Rebirth.MainFrame.MainBar.RequirementsProgressBar.GreenBar
+                        if greenBar and greenBar.Size == UDim2.new(1, 0, 1, 0) then
+                            game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("doRebirthEvent"):FireServer()
+                        end
+                    end)
+                    task.wait(1)
+                end
+            end)
+        end
+    end
+})
+
+Tabs.Main:Button({
+    Title = "Buy x1 Strength",
+    Callback = function()
+        pcall(function()
+            local args = { 1 }
+            game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("buySoloEvent"):FireServer(unpack(args))
+        end)
+    end
+})
+
+Tabs.Main:Button({
+    Title = "Buy x10 Strength",
+    Callback = function()
+        pcall(function()
+            local args = { 10 }
+            game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("buySoloEvent"):FireServer(unpack(args))
+        end)
     end
 })
 
