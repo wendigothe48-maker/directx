@@ -283,33 +283,69 @@ Tabs.Main:Toggle({
 
 
 local autoEquip25M = false
+local isMobile = game:GetService("UserInputService").TouchEnabled
+
 Tabs.Main:Toggle({
     Title = "Auto Equip 2.5M Click",
     Callback = function(val)
         autoEquip25M = val
         if val then
+            print("[Auto Equip 2.5M] Toggle ON. Smart Color Detection Active.")
             task.spawn(function()
                 while autoEquip25M do
                     pcall(function()
-                        local hrp = game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                        local player = game.Players.LocalPlayer
+                        local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+                        
                         if hrp then
-                            local lobby = workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("Lobby")
-                            local upgradePart = lobby and lobby:FindFirstChild("Utility") and lobby.Utility:FindFirstChild("Upgrades") and lobby.Utility.Upgrades:FindFirstChild("50000000000") and lobby.Utility.Upgrades["50000000000"]:FindFirstChild("touch")
-                            local touchInterest = upgradePart and upgradePart:FindFirstChild("TouchInterest")
+                            -- Path to the upgrade part safely
+                            local map = workspace:FindFirstChild("Map")
+                            local lobby = map and map:FindFirstChild("Lobby")
+                            local utility = lobby and lobby:FindFirstChild("Utility")
+                            local upgrades = utility and utility:FindFirstChild("Upgrades")
+                            local targetUpgrade = upgrades and upgrades:FindFirstChild("50000000000")
+                            local upgradePart = targetUpgrade and targetUpgrade:FindFirstChild("touch")
                             
-                            if touchInterest then
-                                if isMobile then
-                                    firetouchinterest(upgradePart, hrp, 0)
-                                    task.wait(0.01)
-                                    firetouchinterest(upgradePart, hrp, 1)
-                                else
-                                    firetouchinterest(upgradePart, hrp, 0)
+                            if upgradePart then
+                                local currColor = upgradePart.Color
+                                
+                                -- Color checking logic:
+                                -- Yellow target (255, 242, 0) -> R near 1, G near 0.94, B near 0
+                                local isYellow = (currColor.R > 0.95 and currColor.G > 0.90 and currColor.B < 0.1)
+                                
+                                if isYellow then
+                                    -- [SAFE MODE] Agar color already Yellow (255,242,0) hai, toh TP nahi karega
+                                    -- Taaki aapka baaki farm smoothly chalta rahe
                                 end
+                                
+                                if not isYellow then
+                                    -- [TP MODE] Agar color change hua (jaise 102, 118, 30 hua), toh jab tak yellow nahi hota tab tak TP karega
+                                    print("[Auto Equip 2.5M] Upgrade available! Teleporting to touch part...")
+                                    
+                                    -- Directly part ke upar CFrame set karo thoda sa offset dekar
+                                    hrp.CFrame = upgradePart.CFrame + Vector3.new(0, 2, 0)
+                                    
+                                    -- TouchInterest backup fire taaki instant buy ho jaye
+                                    local touchInterest = upgradePart:FindFirstChild("TouchInterest")
+                                    if touchInterest then
+                                        if isMobile then
+                                            firetouchinterest(upgradePart, hrp, 0)
+                                            task.wait(0.01)
+                                            firetouchinterest(upgradePart, hrp, 1)
+                                        else
+                                            firetouchinterest(upgradePart, hrp, 0)
+                                        end
+                                    end
+                                end
+                            else
+                                print("[Auto Equip 2.5M] Upgrade 'touch' part nahi mila workspace me!")
                             end
                         end
                     end)
-                    task.wait(1)
+                    -- Responsive checking speed (har 0.1 second me check karega color ko)
+                    task.wait(0.1)
                 end
+                print("[Auto Equip 2.5M] Toggle OFF. Loop Closed.")
             end)
         end
     end
