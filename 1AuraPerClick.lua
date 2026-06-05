@@ -90,117 +90,158 @@ Tabs.Main:Toggle({
         end
     end
 })
-
 local autoFarmW1 = false
 local isMobile = game:GetService("UserInputService").TouchEnabled
-local lastW1Log = 0
+
+-- [[ STRICT DOUBLE-VERIFICATION SCANNER ]] --
+local function getTargetWinModel()
+    local map = workspace:FindFirstChild("Map")
+    local stage25 = map and map:FindFirstChild("Stage_25")
+    if not stage25 then return nil, nil end
+    
+    local allChildren = stage25:GetChildren()
+    
+    for idx, child in ipairs(allChildren) do
+        if child.Name == "Win" then
+            
+            -- CONDITION 1: Pehle check karo kya is 'Win' model me hamara 50B wala text hai?
+            local hasTargetText = false
+            local descendants = child:GetDescendants()
+            
+            for _, desc in ipairs(descendants) do
+                local success, txt = pcall(function() return desc.Text end)
+                if success and type(txt) == "string" and txt ~= "" then
+                    local cleanTxt = string.lower(txt):gsub("%s+", "")
+                    if string.find(cleanTxt, "50b") or string.find(cleanTxt, "50w") or string.find(cleanTxt, "+50b") then
+                        hasTargetText = true
+                        break -- Text mil gaya, ab part dhoondna shuru karenge
+                    end
+                end
+            end
+            
+            -- CONDITION 2: Agar text mil gaya hai, toh USI model ke andar se TouchInterest wala sahi part nikaalo
+            if hasTargetText then
+                local realWinPart = nil
+                
+                for _, desc in ipairs(descendants) do
+                    -- Part ka naam WinPart hona chahiye AUR uske andar TouchInterest hona ZAROORI hai
+                    if desc.Name == "WinPart" and desc:IsA("BasePart") and desc:FindFirstChild("TouchInterest") then
+                        realWinPart = desc
+                        break
+                    end
+                end
+                
+                -- Backup Check: Agar naam 'WinPart' nahi bhi hai par usme TouchInterest hai (just in case)
+                if not realWinPart then
+                    for _, desc in ipairs(descendants) do
+                        if desc:IsA("BasePart") and desc:FindFirstChild("TouchInterest") then
+                            realWinPart = desc
+                            break
+                        end
+                    end
+                end
+                
+                -- Agar text bhi mil gaya aur sahi TouchInterest wala part bhi mil gaya, tabhi lock karenge!
+                if realWinPart then
+                    print(string.format("[AutoFarm W1] [TARGET LOCKED] Sahi Text aur Asli TouchInterest wala Part dono mil gaye! Index: [%d], Part Name: '%s'", idx, realWinPart.Name))
+                    return child, realWinPart
+                else
+                    print(string.format("[AutoFarm W1] [WARNING] Index [%d] me text toh mila, par bina TouchInterest wala dummy part tha. Skipping...", idx))
+                end
+            end
+            
+        end
+    end
+    return nil, nil
+end
 
 Tabs.Main:Toggle({
     Title = "Farm Best World 1",
     Callback = function(val)
         autoFarmW1 = val
         if val then
-            print("[AutoFarm W1] Started...")
+            print("[AutoFarm W1] Toggle ON. Double-Verification Mode Active.")
             task.spawn(function()
+                local lockedModel = nil
+                local lockedPart = nil
+                local lastLogTime = 0
+                
                 while autoFarmW1 do
                     pcall(function()
-                        local hrp = game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                        local player = game.Players.LocalPlayer
+                        local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+                        
                         if hrp then
-                            local stage25 = workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("Stage_25")
-                            local winPart = stage25 and stage25:FindFirstChild("Win")
-                            
-                            local shouldLog = (os.clock() - lastW1Log) > 1.0
-                            if shouldLog then lastW1Log = os.clock() end
-                            
-                            if not winPart then
-                                if shouldLog then print("[AutoFarm W1] 'Win' not found in Stage_25. Teleporting user to load region...") end
-                                hrp.CFrame = CFrame.new(-3484, 55, 2)
-                                task.wait(0.5) -- Wait to load region
-                                stage25 = workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("Stage_25")
-                                winPart = stage25 and stage25:FindFirstChild("Win")
-                            end
-                            
-                            if winPart then
-                                local isValid = false
-                                pcall(function()
-                                    local children = winPart:GetChildren()
-                                    if children and #children >= 2 then
-                                        local secondChild = children[2]
-                                        local wa = secondChild:FindFirstChild("winAmount")
-                                        if wa then
-                                            local re = wa:FindFirstChild("Rebirths")
-                                            if re then
-                                                local rebChildren = re:GetChildren()
-                                                if #rebChildren >= 3 then
-                                                    local targetText = rebChildren[3]
-                                                    if (targetText:IsA("TextLabel") or targetText:IsA("TextButton")) and string.find(targetText.Text, "+50B") then
-                                                        isValid = true
-                                                    end
-                                                end
-                                            end
-                                        end
-                                    end
-                                    
-                                    -- Fallback if exact path index fails due to loaded order
-                                    if not isValid then
-                                        for _, v in ipairs(winPart:GetDescendants()) do
-                                            if (v:IsA("TextLabel") or v:IsA("TextButton")) and string.find(v.Text, "50B") then
-                                                isValid = true
-                                                break
-                                            end
-                                        end
-                                    end
-                                end)
+                            -- [[ STEP 1: VERIFY LOCKED TARGET ]] --
+                            -- Agar pehle se locked hai toh check karo ki wo sahi hai aur abhi bhi game me maujood hai
+                            if lockedModel and lockedModel:IsDescendantOf(workspace) and lockedPart and lockedPart:IsDescendantOf(workspace) and lockedPart:FindFirstChild("TouchInterest") then
+                                local distance = (hrp.Position - lockedPart.Position).Magnitude
                                 
-                                if isValid then
-                                    if shouldLog then print("[AutoFarm W1] Target 'Win' part (+50B) found! Moving to center.") end
-                                    
-                                    pcall(function() 
-                                        if winPart:IsA("Model") then
-                                            winPart:PivotTo(CFrame.new(-9, 26, 2))
-                                        elseif winPart:IsA("BasePart") then
-                                            winPart.CFrame = CFrame.new(-9, 26, 2)
-                                        end
-                                    end)
-                                    
-                                    if shouldLog then print("[AutoFarm W1] Teleporting player safely to new Win model Location (-9, 26, 2)") end
-                                    hrp.CFrame = CFrame.new(-9, 26, 2)
-                                    
-                                    local touchInterest = winPart:FindFirstChild("TouchInterest")
-                                    if not touchInterest then
-                                        -- Try looking for touch interest internally
-                                        touchInterest = winPart:FindFirstChildOfClass("TouchTransmitter")
-                                    end
-                                    
+                                -- BYPASS: Agar sahi part paas me hai toh direct spam bina TP ke
+                                if distance < 15 then
+                                    local touchInterest = lockedPart:FindFirstChild("TouchInterest")
                                     if touchInterest then
                                         if isMobile then
-                                            if shouldLog then print("[AutoFarm W1] Firing TouchInterest for MOBILE") end
-                                            firetouchinterest(winPart, hrp, 0)
+                                            firetouchinterest(lockedPart, hrp, 0)
                                             task.wait(0.01)
-                                            firetouchinterest(winPart, hrp, 1)
+                                            firetouchinterest(lockedPart, hrp, 1)
                                         else
-                                            if shouldLog then print("[AutoFarm W1] Firing TouchInterest for PC (0 Only)") end
-                                            firetouchinterest(winPart, hrp, 0)
+                                            firetouchinterest(lockedPart, hrp, 0)
                                         end
-                                    else
-                                        if shouldLog then print("[AutoFarm W1] ERROR: TouchInterest missing inside Win!") end
                                     end
-                                else
-                                    if shouldLog then print("[AutoFarm W1] ERROR: Could not find valid 50B text inside Win!") end
+                                    return 
                                 end
                             else
-                                if shouldLog then print("[AutoFarm W1] FAIL: Could not load Win even after attempting teleport!") end
+                                -- Agar lock toot gaya ya dummy tha, toh reset karo
+                                lockedModel, lockedPart = nil, nil
                             end
+                            
+                            -- [[ STEP 2: SCANNING WITH STRICT RULES ]] --
+                            lockedModel, lockedPart = getTargetWinModel()
+                            
+                            -- Agar nahi mila, toh loading area lekar jao taaki map load ho
+                            if not lockedModel then
+                                if os.clock() - lastLogTime > 2 then
+                                    print("[AutoFarm W1] Asli TouchInterest wala 50B part nahi mila. Loading area (-3484, 55, 2) jaa rahe hain...")
+                                    lastLogTime = os.clock()
+                                end
+                                hrp.CFrame = CFrame.new(-3484, 55, 2)
+                                task.wait(0.5)
+                                
+                                lockedModel, lockedPart = getTargetWinModel()
+                            end
+                            
+                            -- [[ STEP 3: TELEPORT & SPAM REAL PART ]] --
+                            if lockedModel and lockedPart then
+                                -- Ab sirf wahi part TP hoga jiske andar TouchInterest humne step 1 me verify kiya hai
+                                pcall(function()
+                                    lockedPart.CFrame = CFrame.new(-9, 26, 2)
+                                end)
+                                
+                                hrp.CFrame = CFrame.new(-9, 26, 2)
+                                task.wait(0.02)
+                                
+                                local touchInterest = lockedPart:FindFirstChild("TouchInterest")
+                                if touchInterest then
+                                    if isMobile then
+                                        firetouchinterest(lockedPart, hrp, 0)
+                                        task.wait(0.01)
+                                        firetouchinterest(lockedPart, hrp, 1)
+                                    else
+                                        firetouchinterest(lockedPart, hrp, 0)
+                                    end
+                                end
+                            end
+                            
                         end
                     end)
-                    task.wait(0.1)
+                    task.wait(0.02)
                 end
-                print("[AutoFarm W1] Stopped.")
+                print("[AutoFarm W1] Toggle OFF. Loop Closed.")
             end)
         end
     end
 })
-
 local autoEgg = false
 Tabs.Main:Toggle({
     Title = "Auto Egg Hatch (500K)",
