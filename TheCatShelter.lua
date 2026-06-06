@@ -128,7 +128,8 @@ local espHighlights = {}
 
 local function updateESP()
     for char, hl in pairs(espHighlights) do
-        if not char or not char.Parent or not espEnabled then
+        local hum = char and char:FindFirstChild("Humanoid")
+        if not char or not char.Parent or not espEnabled or not hum or hum.Health <= 0 then
             if hl and hl.Parent then hl:Destroy() end
             espHighlights[char] = nil
         end
@@ -138,6 +139,9 @@ local function updateESP()
     
     local function applyEspToChar(char)
         if char.Name == game.Players.LocalPlayer.Name then return end
+        local hum = char:FindFirstChild("Humanoid")
+        if not hum or hum.Health <= 0 then return end
+        
         local isCat = char:FindFirstChild("Ears") ~= nil
         local head = char:FindFirstChild("Head")
         local hasCatState = false
@@ -203,42 +207,89 @@ task.spawn(function()
     end
 end)
 
-local bigCatEnabled = false
+local hitBoxExpanderEnabled = false
+local originalHRP = {}
+
+local function revertHitbox(char)
+    if originalHRP[char] then
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            hrp.Size = originalHRP[char].Size
+            hrp.Transparency = originalHRP[char].Trans
+        end
+        originalHRP[char] = nil
+    end
+end
+
+local function revertAllHitboxes()
+    for char, _ in pairs(originalHRP) do
+        revertHitbox(char)
+    end
+end
+
 Tabs.Main:Toggle({
-    Title = "Big Cat ( Make Cat HitBox Bigger )",
+    Title = "HitBox Expander",
     Callback = function(val)
-        bigCatEnabled = val
+        hitBoxExpanderEnabled = val
+        if not val then
+            pcall(revertAllHitboxes)
+        end
     end
 })
 
 task.spawn(function()
-    while task.wait(1) do
-        if bigCatEnabled then
-            pcall(function()
-                local function resizeCat(char)
-                    if char.Name == game.Players.LocalPlayer.Name then return end
-                    if char:FindFirstChild("Ears") then
-                        local hrp = char:FindFirstChild("HumanoidRootPart")
-                        if hrp then
-                            hrp.Size = Vector3.new(10, 10, 5)
-                            hrp.Transparency = 0.5
-                            hrp.CanCollide = false
+    while task.wait(0.5) do
+        pcall(function()
+            if not hitBoxExpanderEnabled then return end
+            
+            local selfIsCat = false
+            local myChar = workspace:FindFirstChild("Characters") and workspace.Characters:FindFirstChild(game.Players.LocalPlayer.Name) or game.Players.LocalPlayer.Character
+            if myChar and myChar:FindFirstChild("Ears") then
+                selfIsCat = true
+            end
+            
+            local function resizeChar(char)
+                if char.Name == game.Players.LocalPlayer.Name then return end
+                local hrp = char:FindFirstChild("HumanoidRootPart")
+                local hum = char:FindFirstChild("Humanoid")
+                
+                if hrp and hum and hum.Health > 0 and not char:FindFirstChild("PVPOFFGUI") then
+                    local isEnemyCat = char:FindFirstChild("Ears") ~= nil
+                    local shouldExpand = (selfIsCat and not isEnemyCat) or (not selfIsCat and isEnemyCat)
+                    
+                    if shouldExpand then
+                        if not originalHRP[char] then
+                            originalHRP[char] = { Size = hrp.Size, Trans = hrp.Transparency }
                         end
+                        hrp.Size = Vector3.new(10, 10, 5)
+                        hrp.Transparency = 0.5
+                        hrp.CanCollide = false
+                    else
+                        revertHitbox(char)
                     end
+                else
+                    revertHitbox(char)
                 end
-                local charsFolder = workspace:FindFirstChild("Characters")
-                if charsFolder then
-                    for _, char in ipairs(charsFolder:GetChildren()) do
-                        resizeCat(char)
-                    end
+            end
+            
+            local charsFolder = workspace:FindFirstChild("Characters")
+            if charsFolder then
+                for _, char in ipairs(charsFolder:GetChildren()) do
+                    resizeChar(char)
                 end
-                for _, plr in ipairs(game.Players:GetPlayers()) do
-                    if plr ~= game.Players.LocalPlayer and plr.Character then
-                        resizeCat(plr.Character)
-                    end
+            end
+            for _, plr in ipairs(game.Players:GetPlayers()) do
+                if plr ~= game.Players.LocalPlayer and plr.Character then
+                    resizeChar(plr.Character)
                 end
-            end)
-        end
+            end
+            
+            for char, _ in pairs(originalHRP) do
+                if not char.Parent then
+                    originalHRP[char] = nil
+                end
+            end
+        end)
     end
 end)
 
@@ -277,18 +328,42 @@ local function updateSphere()
     if not spherePart or not spherePart.Parent then
         spherePart = Instance.new("Part")
         spherePart.Shape = Enum.PartType.Ball
-        spherePart.Material = Enum.Material.Neon
+        spherePart.Material = Enum.Material.Plastic
         spherePart.Color = Color3.new(1, 0, 0)
-        spherePart.Transparency = 0
+        spherePart.Transparency = 0.2
         spherePart.CanCollide = false
         spherePart.Anchored = true
         spherePart.CastShadow = false
         spherePart.Parent = workspace
+        
+        local innerSphere = Instance.new("Part")
+        innerSphere.Name = "InnerSphere"
+        innerSphere.Shape = Enum.PartType.Ball
+        innerSphere.Material = Enum.Material.Plastic
+        innerSphere.Color = Color3.new(1, 0, 0)
+        innerSphere.Transparency = 0.2
+        innerSphere.CanCollide = false
+        innerSphere.Anchored = true
+        innerSphere.CastShadow = false
+        
+        local mesh = Instance.new("SpecialMesh")
+        mesh.MeshType = Enum.MeshType.Sphere
+        mesh.Scale = Vector3.new(-1, -1, -1)
+        mesh.Parent = innerSphere
+        
+        innerSphere.Parent = spherePart
     end
     
     spherePart.Size = Vector3.new(killAuraRadius * 2, killAuraRadius * 2, killAuraRadius * 2)
     spherePart.Position = hrp.Position
-    spherePart.Transparency = 0
+    spherePart.Transparency = 0.2
+    
+    local inner = spherePart:FindFirstChild("InnerSphere")
+    if inner then
+        inner.Size = spherePart.Size
+        inner.Position = spherePart.Position
+        inner.Transparency = spherePart.Transparency
+    end
 end
 
 KillAuraSection:Slider({
@@ -312,8 +387,13 @@ KillAuraSection:Slider({
                 task.delay(2, function()
                     if lastSliderChange == changeTime and spherePart then
                         for i = 1, 100 do
-                            if spherePart then
-                                spherePart.Transparency = i / 100
+                            if spherePart and lastSliderChange == changeTime then
+                                local t = 0.2 + (i / 100) * 0.8
+                                spherePart.Transparency = t
+                                local inner = spherePart:FindFirstChild("InnerSphere")
+                                if inner then inner.Transparency = t end
+                            else
+                                break
                             end
                             task.wait(0.02)
                         end
