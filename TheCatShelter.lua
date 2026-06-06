@@ -96,24 +96,20 @@ Tabs.Main:Button({
         if hrp then
             local oldCFrame = hrp.CFrame
             hrp.CFrame = CFrame.new(16, 23, 512)
-            task.wait(1)
+            task.wait(2)
             
             pcall(function()
                 local mapa = workspace:FindFirstChild("Mapa") or workspace:FindFirstChild("mapa")
                 if mapa then
-                    local p1 = mapa:FindFirstChild("ArmasGivers") and mapa.ArmasGivers:FindFirstChild("Giver") and mapa.ArmasGivers.Giver:FindFirstChild("Ak47")
-                    local p2 = mapa:FindFirstChild("ArmasGivers") and mapa.ArmasGivers.Giver:FindFirstChild("DoubleBarrelShotgun")
+                    local p1 = mapa:FindFirstChild("ArmasGivers") and mapa.ArmasGivers:FindFirstChild("Giver") and mapa.ArmasGivers.Giver:FindFirstChild("DoubleBarrelShotgun")
+                    local p2 = mapa:FindFirstChild("ArmasGivers") and mapa.ArmasGivers.Giver:FindFirstChild("Ak47")
                     local p3 = mapa:FindFirstChild("ArmoursGivers") and mapa.ArmoursGivers:FindFirstChild("Giver") and mapa.ArmoursGivers.Giver:FindFirstChild("Light")
                     
                     local parts = {p1, p2, p3}
                     for i, p in ipairs(parts) do
                         if p and p:IsA("BasePart") then
                             hrp.CFrame = p.CFrame
-                            if i < 3 then
-                                task.wait(1)
-                            else
-                                task.wait(0.1)
-                            end
+                            task.wait(1)
                         end
                     end
                 end
