@@ -319,51 +319,62 @@ KillAuraSection:Toggle({
     end
 })
 
-local spherePart = nil
+local ringFolder = nil
 local lastSliderChange = 0
+local alwaysShowRange = false
 
-local function updateSphere()
+local function updateSphere(isPreview)
     local hrp = game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
     
-    if not spherePart or not spherePart.Parent then
-        spherePart = Instance.new("Part")
-        spherePart.Shape = Enum.PartType.Ball
-        spherePart.Material = Enum.Material.Plastic
-        spherePart.Color = Color3.new(1, 0, 0)
-        spherePart.Transparency = 0.2
-        spherePart.CanCollide = false
-        spherePart.Anchored = true
-        spherePart.CastShadow = false
-        spherePart.Parent = workspace
-        
-        local innerSphere = Instance.new("Part")
-        innerSphere.Name = "InnerSphere"
-        innerSphere.Shape = Enum.PartType.Ball
-        innerSphere.Material = Enum.Material.Plastic
-        innerSphere.Color = Color3.new(1, 0, 0)
-        innerSphere.Transparency = 0.2
-        innerSphere.CanCollide = false
-        innerSphere.Anchored = true
-        innerSphere.CastShadow = false
-        
-        local mesh = Instance.new("SpecialMesh")
-        mesh.MeshType = Enum.MeshType.Sphere
-        mesh.Scale = Vector3.new(-1, -1, -1)
-        mesh.Parent = innerSphere
-        
-        innerSphere.Parent = spherePart
+    if not ringFolder or not ringFolder.Parent then
+        ringFolder = Instance.new("Folder")
+        ringFolder.Name = "AuraRing"
+        ringFolder.Parent = workspace
     end
     
-    spherePart.Size = Vector3.new(killAuraRadius * 2, killAuraRadius * 2, killAuraRadius * 2)
-    spherePart.Position = hrp.Position
-    spherePart.Transparency = 0.2
+    -- Calculate segments based on radius, more radius = more parts for smooth curve
+    local segments = math.clamp(math.floor(killAuraRadius / 2), 16, 72)
+    local angleStep = (math.pi * 2) / segments
+    -- wallWidth calculation so the segments connect at the edges forming a continuous circle
+    local wallWidth = (2 * killAuraRadius * math.tan(math.pi / segments)) + 0.1
     
-    local inner = spherePart:FindFirstChild("InnerSphere")
-    if inner then
-        inner.Size = spherePart.Size
-        inner.Position = spherePart.Position
-        inner.Transparency = spherePart.Transparency
+    local currentParts = ringFolder:GetChildren()
+    if #currentParts < segments then
+        for i = #currentParts + 1, segments do
+            local part = Instance.new("Part")
+            part.Anchored = true
+            part.CanCollide = false
+            part.CastShadow = false
+            part.Material = Enum.Material.Neon
+            part.Parent = ringFolder
+        end
+    elseif #currentParts > segments then
+        for i = segments + 1, #currentParts do
+            currentParts[i]:Destroy()
+        end
+    end
+    
+    currentParts = ringFolder:GetChildren()
+    local center = hrp.Position
+    
+    for i, part in ipairs(currentParts) do
+        local angle = (i - 1) * angleStep
+        local x = center.X + math.cos(angle) * killAuraRadius
+        local z = center.Z + math.sin(angle) * killAuraRadius
+        
+        local pos = Vector3.new(x, center.Y, z)
+        part.Size = Vector3.new(wallWidth, 10, 5)
+        -- Aim towards center (CFrame.lookAt acts same as CFrame.new(pos, lookAt))
+        part.CFrame = CFrame.new(pos, center)
+        -- Ensuring we reset transparency when slider is moved again
+        if alwaysShowRange and not isPreview then
+            part.Color = Color3.fromRGB(150, 150, 150)
+            part.Transparency = 0.85
+        else
+            part.Color = Color3.new(1, 0, 0)
+            part.Transparency = 0.5
+        end
     end
 end
 
@@ -383,24 +394,31 @@ KillAuraSection:Slider({
         
         task.delay(0.05, function()
             if lastSliderChange == changeTime then
-                updateSphere()
+                updateSphere(true)
                 
                 task.delay(2, function()
-                    if lastSliderChange == changeTime and spherePart then
-                        for i = 1, 100 do
-                            if spherePart and lastSliderChange == changeTime then
-                                local t = 0.2 + (i / 100) * 0.8
-                                spherePart.Transparency = t
-                                local inner = spherePart:FindFirstChild("InnerSphere")
-                                if inner then inner.Transparency = t end
-                            else
-                                break
+                    if lastSliderChange == changeTime and ringFolder then
+                        if alwaysShowRange then
+                            for _, part in ipairs(ringFolder:GetChildren()) do
+                                part.Color = Color3.fromRGB(150, 150, 150)
+                                part.Transparency = 0.85
                             end
-                            task.wait(0.02)
-                        end
-                        if spherePart and lastSliderChange == changeTime then
-                            spherePart:Destroy()
-                            spherePart = nil
+                        else
+                            for i = 1, 100 do
+                                if ringFolder and lastSliderChange == changeTime and not alwaysShowRange then
+                                    local t = 0.5 + (i / 100) * 0.5
+                                    for _, part in ipairs(ringFolder:GetChildren()) do
+                                        part.Transparency = t
+                                    end
+                                else
+                                    break
+                                end
+                                task.wait(0.02)
+                            end
+                            if ringFolder and lastSliderChange == changeTime and not alwaysShowRange then
+                                ringFolder:Destroy()
+                                ringFolder = nil
+                            end
                         end
                     end
                 end)
@@ -408,6 +426,29 @@ KillAuraSection:Slider({
         end)
     end
 })
+
+KillAuraSection:Toggle({
+    Title = "Always Show Range",
+    Callback = function(val)
+        alwaysShowRange = val
+        if val then
+            updateSphere(false)
+        else
+            if ringFolder then
+                ringFolder:Destroy()
+                ringFolder = nil
+            end
+        end
+    end
+})
+
+task.spawn(function()
+    while task.wait(0.05) do
+        if alwaysShowRange then
+            updateSphere(false)
+        end
+    end
+end)
 
 local function isSelfCat()
     local myChar = workspace:FindFirstChild("Characters") and workspace.Characters:FindFirstChild(game.Players.LocalPlayer.Name)
@@ -419,6 +460,8 @@ local function isSelfCat()
     end
     return false
 end
+
+local lastTargetTime = 0
 
 task.spawn(function()
     while true do
@@ -525,20 +568,38 @@ task.spawn(function()
                     end
                 end
                 
+                local currentAmmo = "1/1"
+                local ammoGUI = game:GetService("Players").LocalPlayer.PlayerGui:FindFirstChild("AmmoHUD")
+                if ammoGUI and ammoGUI:FindFirstChild("Background") and ammoGUI.Background:FindFirstChild("Ammo") then
+                    currentAmmo = ammoGUI.Background.Ammo.Text
+                end
+                
+                local needsReload = false
+                local ammoLeft, ammoMax = string.match(currentAmmo, "^(%d+)/(%d+)")
+                if ammoLeft and ammoMax then
+                    ammoLeft = tonumber(ammoLeft)
+                    ammoMax = tonumber(ammoMax)
+                    if ammoLeft and ammoMax and ammoMax > 0 then
+                        if ammoLeft == 0 then
+                            needsReload = "immediate"
+                        elseif ammoLeft / ammoMax < 0.25 then
+                            needsReload = "idle"
+                        end
+                    end
+                elseif string.match(currentAmmo, "^Reloading") then
+                    needsReload = "reloading"
+                end
+
                 if targetPlayerName and game:GetService("Players"):FindFirstChild(targetPlayerName) and game:GetService("Players"):FindFirstChild(targetPlayerName).Character then
                     local targetChar = game.Players[targetPlayerName].Character
                     local actualTargetPart = targetChar:WaitForChild("HumanoidRootPart")
                     
-                    local currentAmmo = "1/1"
-                    local ammoGUI = game:GetService("Players").LocalPlayer.PlayerGui:FindFirstChild("AmmoHUD")
-                    if ammoGUI and ammoGUI:FindFirstChild("Background") and ammoGUI.Background:FindFirstChild("Ammo") then
-                        currentAmmo = ammoGUI.Background.Ammo.Text
-                    end
+                    lastTargetTime = tick()
                     
-                    if string.match(currentAmmo, "^0/") then
+                    if needsReload == "immediate" then
                         game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("ReloadRequest"):FireServer(equippedWeapon)
                         loopDelay = 0.5
-                    elseif string.match(currentAmmo, "^Reloading") then
+                    elseif needsReload == "reloading" then
                         loopDelay = 0.1
                     else
                         if equippedWeapon == "DoubleBarrelShotgun" then
@@ -585,6 +646,11 @@ task.spawn(function()
                         end
                         loopDelay = 0.02
                     end
+                else
+                    if needsReload == "idle" and tick() - lastTargetTime >= 1 then
+                        game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("ReloadRequest"):FireServer(equippedWeapon)
+                        loopDelay = 0.5
+                    end
                 end
             end)
             task.wait(loopDelay)
@@ -601,7 +667,12 @@ local TeleportLocations = {
 
 local selectedTeleportArea = "Cat Base"
 
-local AreaTPSection = Tabs.Teleport:Section({ Title = "Area Teleport" })
+local AreaTPSection = Tabs.Teleport:Section({ 
+    Title = "Area Teleport",
+    Box = true,
+    BoxBorder = true,
+    Opened = true
+})
 
 AreaTPSection:Button({
     Title = "Teleport To An Area",
