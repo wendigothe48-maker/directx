@@ -96,28 +96,29 @@ Tabs.Main:Button({
         if hrp then
             local oldCFrame = hrp.CFrame
             hrp.CFrame = CFrame.new(16, 23, 512)
-            task.wait(0.5)
+            task.wait(1)
             
             pcall(function()
                 local mapa = workspace:FindFirstChild("Mapa") or workspace:FindFirstChild("mapa")
                 if mapa then
-                    local t1 = mapa:FindFirstChild("ArmasGivers") and mapa.ArmasGivers:FindFirstChild("Giver") and mapa.ArmasGivers.Giver:FindFirstChild("Ak47") and mapa.ArmasGivers.Giver.Ak47:FindFirstChild("TouchInterest")
-                    local t2 = mapa:FindFirstChild("ArmasGivers") and mapa.ArmasGivers.Giver:FindFirstChild("DoubleBarrelShotgun") and mapa.ArmasGivers.Giver.DoubleBarrelShotgun:FindFirstChild("TouchInterest")
-                    local t3 = mapa:FindFirstChild("ArmoursGivers") and mapa.ArmoursGivers:FindFirstChild("Giver") and mapa.ArmoursGivers.Giver:FindFirstChild("Light") and mapa.ArmoursGivers.Giver.Light:FindFirstChild("TouchInterest")
+                    local p1 = mapa:FindFirstChild("ArmasGivers") and mapa.ArmasGivers:FindFirstChild("Giver") and mapa.ArmasGivers.Giver:FindFirstChild("Ak47")
+                    local p2 = mapa:FindFirstChild("ArmasGivers") and mapa.ArmasGivers.Giver:FindFirstChild("DoubleBarrelShotgun")
+                    local p3 = mapa:FindFirstChild("ArmoursGivers") and mapa.ArmoursGivers:FindFirstChild("Giver") and mapa.ArmoursGivers.Giver:FindFirstChild("Light")
                     
-                    local interests = {t1, t2, t3}
-                    for _, t in ipairs(interests) do
-                        if t then
-                            firetouchinterest(t.Parent, hrp, 0)
-                            task.wait(0.01)
-                            firetouchinterest(t.Parent, hrp, 1)
-                            task.wait(0.1)
+                    local parts = {p1, p2, p3}
+                    for i, p in ipairs(parts) do
+                        if p and p:IsA("BasePart") then
+                            hrp.CFrame = p.CFrame
+                            if i < 3 then
+                                task.wait(1)
+                            else
+                                task.wait(0.1)
+                            end
                         end
                     end
                 end
             end)
             
-            task.wait(0.5)
             hrp.CFrame = oldCFrame
         end
     end
