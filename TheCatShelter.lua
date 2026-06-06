@@ -461,6 +461,22 @@ local function isSelfCat()
     return false
 end
 
+local WeaponData = {
+    RPG7 = { FireRate = 2, BulletCount = 1 },
+    M60 = { FireRate = 0.06, BulletCount = 2 },
+    DoubleBarrelShotgun = { FireRate = 0.4, BulletCount = 12 },
+    GoldenAk47 = { FireRate = 0.08, BulletCount = 1 },
+    Uzi = { FireRate = 0.05, BulletCount = 2 },
+    Revolver = { FireRate = 0.15, BulletCount = 1 },
+    Rifle = { FireRate = 0.09, BulletCount = 1 },
+    AWMSniper = { FireRate = 1, BulletCount = 1 },
+    Ak47 = { FireRate = 0.1, BulletCount = 1 },
+    Pistol = { FireRate = 0.1, BulletCount = 1 },
+    Shotgun = { FireRate = 0.9, BulletCount = 7 },
+    TranquilizerGun = { FireRate = 0.15, BulletCount = 1 }
+}
+local WeaponsPriority = { "GoldenAk47", "M60", "Rifle", "Uzi", "Ak47", "RPG7", "Revolver", "Pistol", "DoubleBarrelShotgun", "Shotgun", "AWMSniper", "TranquilizerGun" }
+
 local lastTargetTime = 0
 
 task.spawn(function()
@@ -488,7 +504,7 @@ task.spawn(function()
                 local hrp = myChar and myChar:FindFirstChild("HumanoidRootPart")
                 if not hrp then return end
                 
-                local weapons = {"AWMSniper", "M60", "GoldenAk47", "Rifle", "Ak47", "DoubleBarrelShotgun", "Shotgun"}
+                local weapons = WeaponsPriority
                 
                 local equippedWeapon = nil
                 local foundWeapon = nil
@@ -602,49 +618,34 @@ task.spawn(function()
                     elseif needsReload == "reloading" then
                         loopDelay = 0.1
                     else
-                        if equippedWeapon == "DoubleBarrelShotgun" then
-                            local args = {
-                                "DoubleBarrelShotgun",
-                                {
-                                    { Direction = Vector3.new(-0.8777754902839661, 0.35243743658065796, 0.32449692487716675), HitPart = actualTargetPart, HitPosition = actualTargetPart.Position, Origin = hrp.Position },
-                                    { Direction = Vector3.new(-0.8908711671829224, 0.30258309841156006, 0.338809996843338), HitPart = actualTargetPart, HitPosition = actualTargetPart.Position, Origin = hrp.Position },
-                                    { Direction = Vector3.new(-0.9362114667892456, 0.23900267481803894, 0.25765499472618103), HitPart = actualTargetPart, HitPosition = actualTargetPart.Position, Origin = hrp.Position },
-                                    { Direction = Vector3.new(-0.9233906269073486, 0.27403345704078674, 0.26880407333374023), HitPart = actualTargetPart, HitPosition = actualTargetPart.Position, Origin = hrp.Position },
-                                    { Direction = Vector3.new(-0.9175576567649841, 0.2601691484451294, 0.30066612362861633), HitPart = actualTargetPart, HitPosition = actualTargetPart.Position, Origin = hrp.Position },
-                                    { Direction = Vector3.new(-0.8845078349113464, 0.33693602681159973, 0.32267671823501587), HitPart = actualTargetPart, HitPosition = actualTargetPart.Position, Origin = hrp.Position },
-                                    { Direction = Vector3.new(-0.9172711968421936, 0.3114051818847656, 0.24827507138252258), HitPart = actualTargetPart, HitPosition = actualTargetPart.Position, Origin = hrp.Position },
-                                    { Direction = Vector3.new(-0.8665684461593628, 0.35421502590179443, 0.35155510902404785), HitPart = actualTargetPart, HitPosition = actualTargetPart.Position, Origin = hrp.Position },
-                                    { Direction = Vector3.new(-0.9057658910751343, 0.23491910099983215, 0.35270562767982483), HitPart = actualTargetPart, HitPosition = actualTargetPart.Position, Origin = hrp.Position },
-                                    { Direction = Vector3.new(-0.8902404308319092, 0.3309277892112732, 0.31298378109931946), HitPart = actualTargetPart, HitPosition = actualTargetPart.Position, Origin = hrp.Position },
-                                    { Direction = Vector3.new(-0.9130688905715942, 0.29724279046058655, 0.2791989743709564), HitPart = actualTargetPart, HitPosition = actualTargetPart.Position, Origin = hrp.Position },
-                                    { Direction = Vector3.new(-0.8934589624404907, 0.3214917778968811, 0.313646525144577), HitPart = actualTargetPart, HitPosition = actualTargetPart.Position, Origin = hrp.Position }
-                                }
-                            }
-                            game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("ShootRequest"):FireServer(unpack(args))
-                        elseif equippedWeapon == "Shotgun" then
-                            local args = {
-                                "Shotgun",
-                                {
-                                    { Direction = Vector3.new(0.8891921639442444, 0.3844687342643738, 0.24803447723388672), HitPart = actualTargetPart, HitPosition = actualTargetPart.Position, Origin = hrp.Position },
-                                    { Direction = Vector3.new(0.8799793124198914, 0.4288162291049957, 0.20433567464351654), HitPart = actualTargetPart, HitPosition = actualTargetPart.Position, Origin = hrp.Position },
-                                    { Direction = Vector3.new(0.8953884243965149, 0.376289427280426, 0.23808813095092773), HitPart = actualTargetPart, HitPosition = actualTargetPart.Position, Origin = hrp.Position },
-                                    { Direction = Vector3.new(0.885267436504364, 0.3988744914531708, 0.23916688561439514), HitPart = actualTargetPart, HitPosition = actualTargetPart.Position, Origin = hrp.Position },
-                                    { Direction = Vector3.new(0.8662892580032349, 0.4485095739364624, 0.21995949745178223), HitPart = actualTargetPart, HitPosition = actualTargetPart.Position, Origin = hrp.Position },
-                                    { Direction = Vector3.new(0.8932737112045288, 0.41170379519462585, 0.18044978380203247), HitPart = actualTargetPart, HitPosition = actualTargetPart.Position, Origin = hrp.Position },
-                                    { Direction = Vector3.new(0.8662761449813843, 0.45726028084754944, 0.20119325816631317), HitPart = actualTargetPart, HitPosition = actualTargetPart.Position, Origin = hrp.Position }
-                                }
-                            }
-                            game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("ShootRequest"):FireServer(unpack(args))
-                        else
-                            local args = {
-                                equippedWeapon,
-                                {
-                                    { Direction = Vector3.new(-0.08102967590093613, -0.9508105516433716, 0.2989876866340637), HitPart = actualTargetPart, HitPosition = actualTargetPart.Position, Origin = hrp.Position }
-                                }
-                            }
-                            game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("ShootRequest"):FireServer(unpack(args))
+                        local fireRate = WeaponData[equippedWeapon] and WeaponData[equippedWeapon].FireRate or 0.1
+                        local bCount = WeaponData[equippedWeapon] and WeaponData[equippedWeapon].BulletCount or 1
+                        local targetDir = (actualTargetPart.Position - hrp.Position).Unit
+                        
+                        local bullets = {}
+                        for i = 1, bCount do
+                            local dir = targetDir
+                            if bCount > 1 then
+                                dir = CFrame.lookAt(Vector3.zero, targetDir) * CFrame.Angles(
+                                    (math.random() - 0.5) * 0.05,
+                                    (math.random() - 0.5) * 0.05,
+                                    0
+                                ).LookVector
+                            end
+                            table.insert(bullets, {
+                                Direction = dir,
+                                HitPart = actualTargetPart,
+                                HitPosition = actualTargetPart.Position,
+                                Origin = hrp.Position
+                            })
                         end
-                        loopDelay = 0.02
+                        
+                        local args = {
+                            equippedWeapon,
+                            bullets
+                        }
+                        game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("ShootRequest"):FireServer(unpack(args))
+                        loopDelay = fireRate
                     end
                 else
                     if needsReload == "idle" and tick() - lastTargetTime >= 1 then
