@@ -101,15 +101,28 @@ Tabs.Main:Button({
             pcall(function()
                 local mapa = workspace:FindFirstChild("Mapa") or workspace:FindFirstChild("mapa")
                 if mapa then
-                    local p1 = mapa:FindFirstChild("ArmasGivers") and mapa.ArmasGivers:FindFirstChild("Giver") and mapa.ArmasGivers.Giver:FindFirstChild("DoubleBarrelShotgun")
-                    local p2 = mapa:FindFirstChild("ArmasGivers") and mapa.ArmasGivers.Giver:FindFirstChild("Ak47")
-                    local p3 = mapa:FindFirstChild("ArmoursGivers") and mapa.ArmoursGivers:FindFirstChild("Giver") and mapa.ArmoursGivers.Giver:FindFirstChild("Light")
+                    local function getGiverPart(giverFolder, partName)
+                        if not giverFolder then return nil end
+                        for _, child in ipairs(giverFolder:GetChildren()) do
+                            if child.Name == partName and child:FindFirstChild("TouchInterest") then
+                                return child
+                            end
+                        end
+                        return giverFolder:FindFirstChild(partName)
+                    end
+                    
+                    local armasGiver = mapa:FindFirstChild("ArmasGivers") and mapa.ArmasGivers:FindFirstChild("Giver")
+                    local armoursGiver = mapa:FindFirstChild("ArmoursGivers") and mapa.ArmoursGivers:FindFirstChild("Giver")
+                    
+                    local p1 = getGiverPart(armasGiver, "DoubleBarrelShotgun")
+                    local p2 = getGiverPart(armasGiver, "Ak47")
+                    local p3 = getGiverPart(armoursGiver, "Light")
                     
                     local parts = {p1, p2, p3}
                     for i, p in ipairs(parts) do
                         if p and p:IsA("BasePart") then
                             hrp.CFrame = p.CFrame
-                            task.wait(1)
+                            task.wait(1.5)
                         end
                     end
                 end
@@ -140,10 +153,14 @@ local function updateESP()
         if not hum or hum.Health <= 0 then return end
         
         local isCat = char:FindFirstChild("Ears") ~= nil
-        local head = char:FindFirstChild("Head")
         local hasCatState = false
-        if head and head:FindFirstChild("CatStateBillboardGUI") then
-            hasCatState = true
+        
+        if isCat then
+            local head = char:FindFirstChild("Head")
+            local catState = head and head:FindFirstChild("CatStateBillboardGUI")
+            if catState then
+                hasCatState = true
+            end
         end
         
         local color = Color3.new(0, 0, 1) -- Blue for Police
@@ -197,7 +214,7 @@ Tabs.Main:Toggle({
 })
 
 task.spawn(function()
-    while task.wait(0.5) do
+    while task.wait(1) do
         if espEnabled then
             pcall(updateESP)
         end
