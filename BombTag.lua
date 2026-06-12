@@ -829,6 +829,17 @@ else
     })
 end
 
+pcall(function()
+    local touchInterest = workspace:FindFirstChild("Map") 
+        and workspace.Map:FindFirstChild("Lava")
+        and workspace.Map.Lava:FindFirstChild("TouchPart")
+        and workspace.Map.Lava.TouchPart:FindFirstChild("TouchInterest")
+    
+    if touchInterest then
+        touchInterest:Destroy()
+    end
+end)
+
 WindUI:Notify({
     Title = "Prime X Hub",
     Content = "Script loaded successfully!",
