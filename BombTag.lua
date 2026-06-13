@@ -829,14 +829,18 @@ else
     })
 end
 
-pcall(function()
-    local touchInterest = workspace:FindFirstChild("Map") 
-        and workspace.Map:FindFirstChild("Lava")
-        and workspace.Map.Lava:FindFirstChild("TouchPart")
-        and workspace.Map.Lava.TouchPart:FindFirstChild("TouchInterest")
-    
-    if touchInterest then
-        touchInterest:Destroy()
+task.spawn(function()
+    while task.wait(1) do
+        pcall(function()
+            local touchInterest = workspace:FindFirstChild("Map") 
+                and workspace.Map:FindFirstChild("Lava")
+                and workspace.Map.Lava:FindFirstChild("TouchPart")
+                and workspace.Map.Lava.TouchPart:FindFirstChild("TouchInterest")
+            
+            if touchInterest then
+                touchInterest:Destroy()
+            end
+        end)
     end
 end)
 
