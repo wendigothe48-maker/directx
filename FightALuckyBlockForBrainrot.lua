@@ -99,17 +99,31 @@ Tabs.Main:Toggle({
         autoFarmLuckyBlock = Value
         if Value then
             task.spawn(function()
+                local timeStuck = 0
                 while autoFarmLuckyBlock do
                     pcall(function()
                         local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
                         if hrp then
                             if hrp.Position.X > 291.75 then
+                                timeStuck = 0
+                                task.wait(0.7)
+                                hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
                                 local startPoint = workspace:FindFirstChild("RoadMap") and workspace.RoadMap:FindFirstChild("StartPoint")
-                                if startPoint then
+                                if hrp and hrp.Position.X > 291.75 and startPoint then
                                     hrp.CFrame = startPoint.CFrame
                                 end
                             else
                                 game:GetService("ReplicatedStorage"):WaitForChild("ConsPackages"):WaitForChild("Link"):WaitForChild("RemoteEvents"):WaitForChild("DamageBoostClick"):FireServer()
+                                local startPoint = workspace:FindFirstChild("RoadMap") and workspace.RoadMap:FindFirstChild("StartPoint")
+                                if startPoint and (hrp.Position - startPoint.Position).Magnitude < 15 then
+                                    timeStuck = timeStuck + 0.04
+                                    if timeStuck >= 3 then
+                                        hrp.CFrame = CFrame.new(298, 6, 342)
+                                        timeStuck = 0
+                                    end
+                                else
+                                    timeStuck = 0
+                                end
                             end
                         end
                     end)
