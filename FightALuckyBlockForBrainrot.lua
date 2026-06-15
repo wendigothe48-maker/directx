@@ -107,16 +107,13 @@ Tabs.Main:Toggle({
                                 local startPoint = workspace:FindFirstChild("RoadMap") and workspace.RoadMap:FindFirstChild("StartPoint")
                                 if startPoint then
                                     hrp.CFrame = startPoint.CFrame
-                                    
-                                    repeat
-                                        task.wait(0.1)
-                                        hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                                    until not autoFarmLuckyBlock or not hrp or hrp.Position.X > 291.75
                                 end
+                            else
+                                game:GetService("ReplicatedStorage"):WaitForChild("ConsPackages"):WaitForChild("Link"):WaitForChild("RemoteEvents"):WaitForChild("DamageBoostClick"):FireServer()
                             end
                         end
                     end)
-                    task.wait(0.1)
+                    task.wait(0.04)
                 end
             end)
         end
