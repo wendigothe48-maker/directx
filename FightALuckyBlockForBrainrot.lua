@@ -368,13 +368,19 @@ Tabs.Main:Toggle({
                 while autoBestWeights do
                     pcall(function()
                         local weightShop = LocalPlayer.PlayerGui:FindFirstChild("MainScreen") and LocalPlayer.PlayerGui.MainScreen:FindFirstChild("Interfaces") and LocalPlayer.PlayerGui.MainScreen.Interfaces:FindFirstChild("WeightShop")
+                        if not weightShop then
+                            print("[Auto Best Weight Debug] WeightShop UI not found in PlayerGui.MainScreen.Interfaces")
+                        end
                         if weightShop then
                             local scroll = weightShop:FindFirstChild("Content") and weightShop.Content:FindFirstChild("ScrollingFrame")
+                            if not scroll then
+                                print("[Auto Best Weight Debug] ScrollingFrame not found in WeightShop.Content")
+                            end
                             if scroll then
                                 local validWeights = {}
                                 
                                 for _, item in ipairs(scroll:GetChildren()) do
-                                    if item:IsA("Frame") and item:FindFirstChild("Container") then
+                                    if item:IsA("Frame") and item:FindFirstChild("Container") and item.Name ~= "Template" then
                                         local powerLabel = item.Container:FindFirstChild("Info") and item.Container.Info:FindFirstChild("Power")
                                         local buyBtn = item.Container:FindFirstChild("BuyButtons") and item.Container.BuyButtons:FindFirstChild("CashButton") and item.Container.BuyButtons.CashButton:FindFirstChild("ImageButton") and item.Container.BuyButtons.CashButton.ImageButton:FindFirstChild("Front")
                                         local priceLabel = buyBtn and buyBtn:FindFirstChild("Price")
@@ -384,13 +390,14 @@ Tabs.Main:Toggle({
                                             local powerNum = CustomParseValue(powerStr)
                                             
                                             local priceStr = priceLabel.Text
+                                            local pl = string.lower(priceStr)
                                             local status = "buy"
                                             local priceNum = math.huge
                                             
-                                            if priceStr == "Equipped" then
+                                            if pl:find("equipped") then
                                                 status = "equipped"
                                                 priceNum = 0
-                                            elseif priceStr == "Equip" then
+                                            elseif pl:find("equip") then
                                                 status = "equip"
                                                 priceNum = 0
                                             else
@@ -409,10 +416,23 @@ Tabs.Main:Toggle({
                                     end
                                 end
                                 
+                                if #validWeights == 0 then
+                                    print("[Auto Best Weight Debug] No valid weights found in ScrollingFrame! Check the UI paths (Power/Price labels).")
+                                end
+                                
                                 table.sort(validWeights, function(a, b) return a.Power > b.Power end)
                                 
-                                local myCashText = LocalPlayer.leaderstats:FindFirstChild("Cash") and LocalPlayer.leaderstats.Cash.Value or 0
-                                local myCash = CustomParseValue(myCashText)
+                                local myCoinsText = "0"
+                                local coinsObj = LocalPlayer.leaderstats:FindFirstChild("Coins")
+                                if coinsObj then
+                                    if coinsObj:IsA("StringValue") then
+                                        myCoinsText = coinsObj.Value
+                                    else
+                                        myCoinsText = tostring(coinsObj.Value)
+                                    end
+                                end
+                                local myCoins = CustomParseValue(myCoinsText)
+                                print(string.format("[Auto Best Weight] Checked. Current Coins: %s (Parsed: %s). Found %d weights.", myCoinsText, tostring(myCoins), #validWeights))
                                 
                                 local currentBestOwnedPower = -1
                                 local currentBestOwnedWeight = nil
@@ -427,7 +447,7 @@ Tabs.Main:Toggle({
                                         end
                                     end
                                     
-                                    if weight.Status == "buy" and myCash >= weight.PriceNum then
+                                    if weight.Status == "buy" and myCoins >= weight.PriceNum then
                                         if weight.Power > bestBuyablePower then
                                             bestBuyablePower = weight.Power
                                             bestBuyableWeight = weight
@@ -436,14 +456,17 @@ Tabs.Main:Toggle({
                                 end
                                 
                                 if bestBuyablePower > currentBestOwnedPower and bestBuyableWeight then
-                                    print(string.format("[Auto Best Weight] Buying new best weight: %s | Price: %s | MyCash: %s | Power: %s", bestBuyableWeight.Name, bestBuyableWeight.RawPrice, tostring(myCash), tostring(bestBuyableWeight.Power)))
+                                    print(string.format("[Auto Best Weight] Buying new best weight: %s | Price: %s | MyCoins: %s | Power: %s", bestBuyableWeight.Name, bestBuyableWeight.RawPrice, tostring(myCoins), tostring(bestBuyableWeight.Power)))
                                     game:GetService("ReplicatedStorage"):WaitForChild("ConsPackages"):WaitForChild("Link"):WaitForChild("RemoteEvents"):WaitForChild("BuyWeightCash"):FireServer(bestBuyableWeight.Name)
-                                    game:GetService("ReplicatedStorage"):WaitForChild("ConsPackages"):WaitForChild("Link"):WaitForChild("RemoteEvents"):WaitForChild("BuyWeight"):FireServer(bestBuyableWeight.Name)
                                     task.wait(0.2)
                                     game:GetService("ReplicatedStorage"):WaitForChild("ConsPackages"):WaitForChild("Link"):WaitForChild("RemoteEvents"):WaitForChild("EquipWeight"):FireServer(bestBuyableWeight.Name)
                                 elseif currentBestOwnedWeight and currentBestOwnedWeight.Status == "equip" then
-                                    print(string.format("[Auto Best Weight] Equipping best owned weight: %s | Power: %s", currentBestOwnedWeight.Name, tostring(currentBestOwnedWeight.Power)))
-                                    game:GetService("ReplicatedStorage"):WaitForChild("ConsPackages"):WaitForChild("Link"):WaitForChild("RemoteEvents"):WaitForChild("EquipWeight"):FireServer(currentBestOwnedWeight.Name)
+                                    if currentBestOwnedWeight.Power >= bestBuyablePower then
+                                        print(string.format("[Auto Best Weight] Equipping best owned weight: %s | Power: %s", currentBestOwnedWeight.Name, tostring(currentBestOwnedWeight.Power)))
+                                        game:GetService("ReplicatedStorage"):WaitForChild("ConsPackages"):WaitForChild("Link"):WaitForChild("RemoteEvents"):WaitForChild("EquipWeight"):FireServer(currentBestOwnedWeight.Name)
+                                    end
+                                else
+                                    -- print("[Auto Best Weight] No better weight to buy or equip right now.")
                                 end
                             end
                         end
