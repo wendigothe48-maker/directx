@@ -391,7 +391,8 @@ Tabs.Main:Toggle({
                                                 Power = powerNum,
                                                 Status = status,
                                                 PriceNum = priceNum,
-                                                Item = item
+                                                Item = item,
+                                                RawPrice = priceStr
                                             })
                                         end
                                     end
@@ -399,17 +400,21 @@ Tabs.Main:Toggle({
                                 
                                 table.sort(validWeights, function(a, b) return a.Power > b.Power end)
                                 
-                                local myCoinsText = LocalPlayer.leaderstats:FindFirstChild("Coins") and LocalPlayer.leaderstats.Coins.Value or 0
-                                local myCoins = CustomParseValue(myCoinsText)
+                                local myCashText = LocalPlayer.leaderstats:FindFirstChild("Cash") and LocalPlayer.leaderstats.Cash.Value or 0
+                                local myCash = CustomParseValue(myCashText)
                                 
                                 for _, weight in ipairs(validWeights) do
                                     if weight.Status == "equipped" then
+                                        print(string.format("[Auto Best Weight] Best weight is already equipped: %s (Power: %s)", weight.Name, tostring(weight.Power)))
                                         break
                                     elseif weight.Status == "equip" then
+                                        print(string.format("[Auto Best Weight] Equipping previously bought weight: %s (Power: %s)", weight.Name, tostring(weight.Power)))
                                         game:GetService("ReplicatedStorage"):WaitForChild("ConsPackages"):WaitForChild("Link"):WaitForChild("RemoteEvents"):WaitForChild("EquipWeight"):FireServer(weight.Name)
                                         break
-                                    elseif weight.Status == "buy" and myCoins >= weight.PriceNum then
+                                    elseif weight.Status == "buy" and myCash >= weight.PriceNum then
+                                        print(string.format("[Auto Best Weight] Buying new weight: %s | Price: %s | MyCash: %s", weight.Name, weight.RawPrice, tostring(myCash)))
                                         game:GetService("ReplicatedStorage"):WaitForChild("ConsPackages"):WaitForChild("Link"):WaitForChild("RemoteEvents"):WaitForChild("BuyWeightCash"):FireServer(weight.Name)
+                                        game:GetService("ReplicatedStorage"):WaitForChild("ConsPackages"):WaitForChild("Link"):WaitForChild("RemoteEvents"):WaitForChild("BuyWeight"):FireServer(weight.Name)
                                         task.wait(0.2)
                                         game:GetService("ReplicatedStorage"):WaitForChild("ConsPackages"):WaitForChild("Link"):WaitForChild("RemoteEvents"):WaitForChild("EquipWeight"):FireServer(weight.Name)
                                         break
