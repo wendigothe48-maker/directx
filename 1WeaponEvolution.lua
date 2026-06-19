@@ -90,28 +90,42 @@ end
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
+local executorName = identifyexecutor and ({identifyexecutor()})[1] or "Unknown"
+print("Aapka Executor: " .. tostring(executorName))
+
+local function fireTouch(part, toPart)
+    if not part or not toPart then return end
+    
+    if type(executorName) == "string" and string.find(string.lower(executorName), "xeno") then
+        firetouchinterest(part, toPart, 0)
+        return
+    end
+
+    local UIS = game:GetService("UserInputService")
+    local isMobile = UIS.TouchEnabled and not UIS.MouseEnabled
+    if isMobile then
+        firetouchinterest(part, toPart, 0)
+        task.wait(0.01)
+        firetouchinterest(part, toPart, 1)
+    else
+        firetouchinterest(part, toPart, 0)
+    end
+end
+
 local parseWins = function(valStr)
     if type(valStr) ~= "string" then valStr = tostring(valStr) end
-    local wVal = string.upper(valStr)
-    wVal = string.gsub(wVal, "<[^>]+>", "")
-    wVal = string.gsub(wVal, ",", "")
-    wVal = string.gsub(wVal, "WINS", "")
-    wVal = string.gsub(wVal, "REQUIRED", "")
-    wVal = string.gsub(wVal, "%s+", "")
+    -- Remove rich text tags
+    local cleanStr = string.gsub(valStr, "<[^>]+>", "")
     
-    local numVal, suffix = string.match(wVal, "([%d%.]+)([KMBT]?)")
-    if numVal then
-        local n = tonumber(numVal)
-        if n then
-            if suffix == "K" then n = n * 1000
-            elseif suffix == "M" then n = n * 1000000
-            elseif suffix == "B" then n = n * 1000000000
-            elseif suffix == "T" then n = n * 1000000000000
-            end
-            return n
+    -- Extract just the number and immediate suffix (e.g. from "20Sx WINS REQUIRED", grabs "20" and "Sx")
+    local numPart, suffixPart = string.match(cleanStr, "([%d%.]+)%s*([a-zA-Z]*)")
+    
+    if numPart then
+        local toParse = numPart .. (suffixPart or "")
+        if NumberConverter and type(NumberConverter.Parse) == "function" then
+            return NumberConverter.Parse(toParse)
         end
     end
-    
     return 0
 end
 
@@ -119,12 +133,12 @@ local FarmingSection = Tabs.Main:Section({ Title = "Farming", Box = true, BoxBor
 
 local PetsSection = Tabs.Main:Section({ Title = "Slimes", Box = true, BoxBorder = true, Opened = true })
 
-local autoFarmClicksEnabled = false
+_G.SpamToggle = false
 FarmingSection:Toggle({
     Title = "Auto Farm Clicks",
     Value = false,
     Callback = function(Value)
-        autoFarmClicksEnabled = Value
+        _G.SpamToggle = Value
         if Value then
             task.spawn(function()
                 local replicatedStorage = game:GetService("ReplicatedStorage")
@@ -137,15 +151,19 @@ FarmingSection:Toggle({
                 end
                 
                 local args = { "1" }
+                print("Spamming started...")
                 for i = 1, 50 do
                     task.spawn(function()
-                        while autoFarmClicksEnabled do
+                        while _G.SpamToggle do
                             clickNoob:FireServer(unpack(args))
                             task.wait(0.01)
                         end
+                        print("Thread " .. i .. " stopped.")
                     end)
                 end
             end)
+        else
+            print("Spamming is currently turned off.")
         end
     end
 })
@@ -179,15 +197,7 @@ FarmingSection:Toggle({
                                     if wins then
                                         local t_part = wins:FindFirstChild("T")
                                         if t_part and t_part:IsA("BasePart") then
-                                            local uis = game:GetService("UserInputService")
-                                            local isMobile = uis.TouchEnabled and not uis.MouseEnabled
-                                            if isMobile then
-                                                firetouchinterest(hrp, t_part, 0)
-                                                task.wait(0.01)
-                                                firetouchinterest(hrp, t_part, 1)
-                                            else
-                                                firetouchinterest(hrp, t_part, 0)
-                                            end
+                                            fireTouch(hrp, t_part)
                                         end
                                     end
                                 end
@@ -231,6 +241,9 @@ FarmingSection:Toggle({
                         
                         if winsInfo and winsInfo:IsA("TextLabel") then
                             currentWins = parseWins(winsInfo.Text)
+                            print("[Auto Equip Weapon] Extracted current player wins text:", winsInfo.Text, "Parsed as:", currentWins)
+                        else
+                            print("[Auto Equip Weapon] Could not find wins UI to read.")
                         end
                         
                         local weaponsLayout = workspace:FindFirstChild("WeaponsLayout")
@@ -247,9 +260,11 @@ FarmingSection:Toggle({
                                             local winsLbl = bb:FindFirstChild("Wins")
                                             if winsLbl and winsLbl:IsA("TextLabel") then
                                                 local wCost = parseWins(winsLbl.Text)
+                                                print("[Auto Equip Weapon] Checking Weapon item:", weapon.Name, "| Cost label:", winsLbl.Text, "| Parsed Cost:", wCost)
                                                 if wCost <= currentWins and wCost > bestWeaponCost then
                                                     bestWeaponCost = wCost
                                                     bestWeaponModel = weapon
+                                                    print("  -> NEW BEST CANDIDATE:", weapon.Name, "- Cost:", wCost)
                                                 end
                                             end
                                         end
@@ -258,6 +273,7 @@ FarmingSection:Toggle({
                             end
                             
                             if bestWeaponModel then
+                                print("[Auto Equip Weapon] Highest affordable weapon found:", bestWeaponModel.Name)
                                 local pad = bestWeaponModel:FindFirstChild("Pad")
                                 local hitbox = bestWeaponModel:FindFirstChild("Hitbox")
                                 if pad and hitbox then
@@ -266,22 +282,28 @@ FarmingSection:Toggle({
                                         local union = parts:FindFirstChild("Union")
                                         if union and union:IsA("BasePart") then
                                             local c = union.Color
+                                            print("[Auto Equip Weapon] Checking color for equipped state: R:", c.R*255, "G:", c.G*255, "B:", c.B*255)
                                             local isEquipped = (math.abs(c.R*255 - 58) < 5 and math.abs(c.G*255 - 209) < 5 and math.abs(c.B*255 - 255) < 5)
                                             if not isEquipped then
-                                                local uis = game:GetService("UserInputService")
-                                                local isMobile = uis.TouchEnabled and not uis.MouseEnabled
-                                                if isMobile then
-                                                    firetouchinterest(hrp, hitbox, 0)
-                                                    task.wait(0.01)
-                                                    firetouchinterest(hrp, hitbox, 1)
-                                                else
-                                                    firetouchinterest(hrp, hitbox, 0)
-                                                end
+                                                print("[Auto Equip Weapon] Weapon is NOT equipped. Proceeding to fire touch interest on Hitbox!")
+                                                fireTouch(hrp, hitbox)
+                                            else
+                                                print("[Auto Equip Weapon] Weapon is ALREADY equipped (color match). Skipping touch.")
                                             end
+                                        else
+                                            print("[Auto Equip Weapon] Union/Part child not found under Parts.")
                                         end
+                                    else
+                                        print("[Auto Equip Weapon] Parts folder not found in Pad.")
                                     end
+                                else
+                                    print("[Auto Equip Weapon] Hitbox or Pad missing on the Best Weapon model.")
                                 end
+                            else
+                                print("[Auto Equip Weapon] No affordable weapon found.")
                             end
+                        else
+                            print("[Auto Equip Weapon] WeaponsLayout not found in workspace.")
                         end
                     end)
                     task.wait(2)
