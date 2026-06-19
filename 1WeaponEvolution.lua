@@ -91,24 +91,21 @@ local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
 local executorName = identifyexecutor and ({identifyexecutor()})[1] or "Unknown"
-print("Aapka Executor: " .. tostring(executorName))
+if type(executorName) == "string" and string.find(string.lower(executorName), "xeno") then
+    print("Detected: Xeno")
+else
+    print("Detected: Non-Xeno (" .. tostring(executorName) .. ")")
+end
 
 local function fireTouch(part, toPart)
     if not part or not toPart then return end
     
     if type(executorName) == "string" and string.find(string.lower(executorName), "xeno") then
         firetouchinterest(part, toPart, 0)
-        return
-    end
-
-    local UIS = game:GetService("UserInputService")
-    local isMobile = UIS.TouchEnabled and not UIS.MouseEnabled
-    if isMobile then
+    else
         firetouchinterest(part, toPart, 0)
         task.wait(0.01)
         firetouchinterest(part, toPart, 1)
-    else
-        firetouchinterest(part, toPart, 0)
     end
 end
 
