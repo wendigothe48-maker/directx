@@ -121,28 +121,39 @@ local function getTop5GiveWinsFolders()
     return topFolders
 end
 
+local executorName = identifyexecutor and ({identifyexecutor()})[1] or "Unknown"
+if type(executorName) == "string" and string.find(string.lower(executorName), "xeno") then
+    print("Detected: Xeno")
+else
+    print("Detected: Non-Xeno (" .. tostring(executorName) .. ")")
+end
+
+local function fireTouch(part, toPart)
+    if not part or not toPart then return end
+    
+    if type(executorName) == "string" and string.find(string.lower(executorName), "xeno") then
+        firetouchinterest(part, toPart, 0)
+    else
+        firetouchinterest(part, toPart, 0)
+        task.wait(0.01)
+        firetouchinterest(part, toPart, 1)
+    end
+end
+
 local parseWins = function(valStr)
     if type(valStr) ~= "string" then valStr = tostring(valStr) end
-    local wVal = string.upper(valStr)
-    wVal = string.gsub(wVal, "<[^>]+>", "")
-    wVal = string.gsub(wVal, ",", "")
-    wVal = string.gsub(wVal, "WINS", "")
-    wVal = string.gsub(wVal, "REQUIRED", "")
-    wVal = string.gsub(wVal, "%s+", "")
+    -- Remove rich text tags
+    local cleanStr = string.gsub(valStr, "<[^>]+>", "")
     
-    local numVal, suffix = string.match(wVal, "([%d%.]+)([KMBT]?)")
-    if numVal then
-        local n = tonumber(numVal)
-        if n then
-            if suffix == "K" then n = n * 1000
-            elseif suffix == "M" then n = n * 1000000
-            elseif suffix == "B" then n = n * 1000000000
-            elseif suffix == "T" then n = n * 1000000000000
-            end
-            return n
+    -- Extract just the number and immediate suffix (e.g. from "20Sx WINS REQUIRED", grabs "20" and "Sx")
+    local numPart, suffixPart = string.match(cleanStr, "([%d%.]+)%s*([a-zA-Z]*)")
+    
+    if numPart then
+        local toParse = numPart .. (suffixPart or "")
+        if NumberConverter and type(NumberConverter.Parse) == "function" then
+            return NumberConverter.Parse(toParse)
         end
     end
-    
     return 0
 end
 
@@ -436,25 +447,31 @@ end)
 
 local FarmingSection = Tabs.Main:Section({ Title = "Farming", Box = true, BoxBorder = true, Opened = true })
 
-local autoFarmStepsEnabled = false
+_G.StepsSpamToggle = false
 FarmingSection:Toggle({
     Title = "Auto Farm Steps",
     Value = false,
     Callback = function(Value)
-        autoFarmStepsEnabled = Value
+        _G.StepsSpamToggle = Value
         if Value then
             task.spawn(function()
-                while autoFarmStepsEnabled do
-                    pcall(function()
-                        for i = 1, 50 do
-                            task.spawn(function()
-                                game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("AddSpeed"):FireServer()
-                            end)
+                local events = game:GetService("ReplicatedStorage"):WaitForChild("Events", 5)
+                local addSpeed = events and events:WaitForChild("AddSpeed", 5)
+                if not addSpeed then return end
+                
+                print("Steps Spamming started...")
+                for i = 1, 50 do
+                    task.spawn(function()
+                        while _G.StepsSpamToggle do
+                            addSpeed:FireServer()
+                            task.wait(0.01)
                         end
+                        print("Thread " .. i .. " stopped.")
                     end)
-                    task.wait(0.01)
                 end
             end)
+        else
+            print("Steps Spamming is currently turned off.")
         end
     end
 })
@@ -552,9 +569,6 @@ FarmingSection:Toggle({
                             hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
                             if hrp then hrp.CFrame = spawnCFrame end
                             
-                            local uis = game:GetService("UserInputService")
-                            local isMobile = uis.TouchEnabled and not uis.MouseEnabled
-                            
                             while autoFarmHighestEnabled do
                                 local currentTop = getTop5GiveWinsFolders()
                                 if #currentTop == 0 or currentTop[1] ~= topFolders[1] then
@@ -576,13 +590,7 @@ FarmingSection:Toggle({
                                         for _, folder in ipairs(topFolders) do
                                             local touchPart = folder:FindFirstChild("Touch")
                                             if touchPart then
-                                                if isMobile then
-                                                    firetouchinterest(hrp, touchPart, 0)
-                                                    task.wait(0.01)
-                                                    firetouchinterest(hrp, touchPart, 1)
-                                                else
-                                                    firetouchinterest(hrp, touchPart, 0)
-                                                end
+                                                fireTouch(hrp, touchPart)
                                             end
                                         end
                                     end
