@@ -187,13 +187,7 @@ end
 
 local autoBuySettings = { Steps = false, Trails = false, Auras = false }
 
-local AutoBuyGroup = Tabs.Main:Group({})
-local AutoBuySection = AutoBuyGroup:Section({ 
-    Title = "Auto Best Buy Shop",
-    Box = true,
-    BoxBorder = true,
-    Opened = true
-})
+local AutoBuySection = Tabs.Main:Section({ Title = "Auto Best Buy Shop", Box = true, BoxBorder = true, Opened = true })
 
 AutoBuySection:Toggle({
     Title = "Auto Buy Steps",
@@ -440,8 +434,10 @@ task.spawn(function()
     end
 end)
 
+local FarmingSection = Tabs.Main:Section({ Title = "Farming", Box = true, BoxBorder = true, Opened = true })
+
 local autoFarmStepsEnabled = false
-Tabs.Main:Toggle({
+FarmingSection:Toggle({
     Title = "Auto Farm Steps",
     Value = false,
     Callback = function(Value)
@@ -450,9 +446,13 @@ Tabs.Main:Toggle({
             task.spawn(function()
                 while autoFarmStepsEnabled do
                     pcall(function()
-                        game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("AddSpeed"):FireServer()
+                        for i = 1, 50 do
+                            task.spawn(function()
+                                game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("AddSpeed"):FireServer()
+                            end)
+                        end
                     end)
-                    task.wait(0.05)
+                    task.wait(0.01)
                 end
             end)
         end
@@ -460,7 +460,7 @@ Tabs.Main:Toggle({
 })
 
 local autoFarmHighestEnabled = false
-Tabs.Main:Toggle({
+FarmingSection:Toggle({
     Title = "Auto Farm Highest",
     Value = false,
     Callback = function(Value)
@@ -601,7 +601,7 @@ Tabs.Main:Toggle({
 })
 
 local autoRebirthEnabled = false
-Tabs.Main:Toggle({
+FarmingSection:Toggle({
     Title = "Auto Rebirth",
     Value = false,
     Callback = function(Value)
@@ -623,7 +623,7 @@ Tabs.Main:Toggle({
 })
 
 local autoRemoveKillPartEnabled = false
-Tabs.Main:Toggle({
+FarmingSection:Toggle({
     Title = "Auto Remove Kill Part",
     Value = false,
     Callback = function(Value)
