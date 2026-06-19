@@ -127,11 +127,23 @@ FarmingSection:Toggle({
         autoFarmClicksEnabled = Value
         if Value then
             task.spawn(function()
-                while autoFarmClicksEnabled do
-                    pcall(function()
-                        game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("ClickNoob"):FireServer("1")
+                local replicatedStorage = game:GetService("ReplicatedStorage")
+                local events = replicatedStorage:WaitForChild("Events", 5)
+                local clickNoob = events and events:WaitForChild("ClickNoob", 5)
+                
+                if not clickNoob then
+                    warn("ClickNoob event nahi mila! Please check path.")
+                    return
+                end
+                
+                local args = { "1" }
+                for i = 1, 50 do
+                    task.spawn(function()
+                        while autoFarmClicksEnabled do
+                            clickNoob:FireServer(unpack(args))
+                            task.wait(0.01)
+                        end
                     end)
-                    task.wait(0.01)
                 end
             end)
         end
