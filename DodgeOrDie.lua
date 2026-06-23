@@ -258,6 +258,9 @@ Tabs.Main:Toggle({
     end
 })
 
+local RunService = game:GetService("RunService")
+local infinityAuraConnection = nil
+
 local infinityAura = false
 Tabs.Main:Toggle({
     Title = "Infinity Aura",
@@ -265,63 +268,86 @@ Tabs.Main:Toggle({
     Callback = function(Value)
         infinityAura = Value
         if Value then
-            task.spawn(function()
-                local lockedBalls = {}
-                while infinityAura do
-                    pcall(function()
-                        local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                        if hrp then
-                            local ballsFolder = workspace:FindFirstChild("Balls")
-                            if ballsFolder then
-                                -- Cleanup deleted balls
-                                for ball, _ in pairs(lockedBalls) do
-                                    if not ball or not ball.Parent then
-                                        lockedBalls[ball] = nil
-                                    end
+            local lockedBalls = {}
+            infinityAuraConnection = RunService.Stepped:Connect(function(time, deltaTime)
+                pcall(function()
+                    local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                    if not hrp then 
+                        table.clear(lockedBalls)
+                        return 
+                    end
+                    
+                    local ballsFolder = workspace:FindFirstChild("Balls")
+                    if not ballsFolder then return end
+                    
+                    -- Cleanup deleted balls
+                    for ball, _ in pairs(lockedBalls) do
+                        if not ball or not ball.Parent then
+                            lockedBalls[ball] = nil
+                        end
+                    end
+                    
+                    for _, child in ipairs(ballsFolder:GetDescendants()) do
+                        if child:IsA("BasePart") then
+                            local hrpPos = hrp.Position
+                            local ballPos = child.Position
+                            local distance = (ballPos - hrpPos).Magnitude
+                            
+                            -- STRICT TRACKING: Detect continuously starting from 25 studs
+                            if distance <= 25 then
+                                local dir = (ballPos - hrpPos).Unit
+                                if dir.X ~= dir.X then -- NaN check if exactly same position
+                                    dir = Vector3.new(1, 0, 0)
                                 end
                                 
-                                for _, child in ipairs(ballsFolder:GetDescendants()) do
-                                    if child:IsA("BasePart") then
-                                        local distance = (child.Position - hrp.Position).Magnitude
-                                        
-                                        if distance < 15 then
-                                            -- Instantly TP outside of the 15 stud range
-                                            local dir = (child.Position - hrp.Position).Unit
-                                            if dir.X ~= dir.X then -- NaN check if exactly same position
-                                                dir = Vector3.new(1, 0, 0)
-                                            end
-                                            
-                                            local newTargetPos = hrp.Position + (dir * 15.5)
-                                            child.CFrame = CFrame.new(newTargetPos)
-                                            child.AssemblyLinearVelocity = Vector3.zero
-                                            child.AssemblyAngularVelocity = Vector3.zero
-                                            
-                                            lockedBalls[child] = child.CFrame
-                                        elseif distance >= 15 and distance <= 20 then
-                                            -- Stuck Range
-                                            if not lockedBalls[child] then
-                                                lockedBalls[child] = child.CFrame
-                                            end
-                                            child.CFrame = lockedBalls[child]
-                                            child.AssemblyLinearVelocity = Vector3.zero
-                                            child.AssemblyAngularVelocity = Vector3.zero
-                                        elseif distance > 20 then
-                                            -- Free the ball
-                                            if lockedBalls[child] then
-                                                lockedBalls[child] = nil
-                                            end
-                                        end
+                                if distance < 15 then
+                                    -- Crossed into the < 15 zone! Freeze and Slowly Push Out
+                                    
+                                    -- Halt velocity immediately
+                                    child.AssemblyLinearVelocity = Vector3.zero
+                                    child.AssemblyAngularVelocity = Vector3.zero
+                                    
+                                    -- Slowly push backwards to 15.5 limit
+                                    local pushSpeed = 15 -- Smooth push out
+                                    local newPos = ballPos + (dir * pushSpeed * deltaTime)
+                                    
+                                    -- Clamp it so it doesn't push way past 15.5 instantly
+                                    if (newPos - hrpPos).Magnitude > 15.5 then
+                                        newPos = hrpPos + (dir * 15.5)
+                                    end
+                                    
+                                    child.CFrame = CFrame.new(newPos)
+                                    lockedBalls[child] = child.CFrame
+                                    
+                                elseif distance >= 15 and distance <= 20 then
+                                    -- Stuck Range
+                                    if not lockedBalls[child] then
+                                        lockedBalls[child] = child.CFrame
+                                    end
+                                    child.CFrame = lockedBalls[child]
+                                    child.AssemblyLinearVelocity = Vector3.zero
+                                    child.AssemblyAngularVelocity = Vector3.zero
+                                else
+                                    -- Between 20 and 25: Track but do not lock yet
+                                    if lockedBalls[child] then
+                                        lockedBalls[child] = nil
                                     end
                                 end
+                            else
+                                -- > 25 studs: Free the ball
+                                if lockedBalls[child] then
+                                    lockedBalls[child] = nil
+                                end
                             end
-                        else
-                            table.clear(lockedBalls)
                         end
-                    end)
-                    -- Run frequent to keep them fully stuck and out of range
-                    task.wait()
-                end
+                    end
+                end)
             end)
+        else
+            if infinityAuraConnection then
+                infinityAuraConnection:Disconnect()
+                infinityAuraConnection = nil
+            end
         end
     end
 })
