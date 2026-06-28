@@ -305,6 +305,22 @@ Tabs.Main:Toggle({
     end
 })
 
+local function GetBrainrotCount()
+    local lp = game:GetService("Players").LocalPlayer
+    local count = 0
+    if lp:FindFirstChild("Backpack") then
+        count = count + #lp.Backpack:GetChildren()
+    end
+    if lp.Character then
+        for _, v in ipairs(lp.Character:GetChildren()) do
+            if v:IsA("Tool") then
+                count = count + 1
+            end
+        end
+    end
+    return count
+end
+
 Tabs.Main:Toggle({
     Title = "Auto Best Place Brainrot",
     Value = false,
@@ -312,19 +328,48 @@ Tabs.Main:Toggle({
         _G.AutoBestPlaceBrainrot = Value
         if Value then
             task.spawn(function()
+                pcall(function()
+                    game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("PlaceBest"):FireServer()
+                end)
+                
                 local prevCount = GetBrainrotCount()
+                local pending = false
+                local lastFireTime = tick()
+                local changeDetectTime = 0
+                
                 while _G.AutoBestPlaceBrainrot do
                     pcall(function()
                         local currentCount = GetBrainrotCount()
+                        
                         if currentCount > prevCount then
-                            game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("PlaceBest"):FireServer()
-                            task.wait(1)
-                            prevCount = GetBrainrotCount()
-                        else
-                            prevCount = currentCount
+                            if not pending then
+                                pending = true
+                                changeDetectTime = tick()
+                            end
+                        end
+                        prevCount = currentCount
+                        
+                        if pending then
+                            local timeSinceLastFire = tick() - lastFireTime
+                            local timeSinceChange = tick() - changeDetectTime
+                            local shouldFire = false
+                            
+                            if timeSinceLastFire >= 12 then
+                                if timeSinceChange >= 3 then
+                                    shouldFire = true
+                                end
+                            end
+                            
+                            if shouldFire then
+                                game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("PlaceBest"):FireServer()
+                                lastFireTime = tick()
+                                pending = false
+                                task.wait(0.5)
+                                prevCount = GetBrainrotCount()
+                            end
                         end
                     end)
-                    task.wait(30)
+                    task.wait(0.5)
                 end
             end)
         end
@@ -410,6 +455,7 @@ Tabs.Main:Toggle({
                                                 if cashPart then
                                                     local attachment = cashPart:FindFirstChild("Attachment")
                                                     local unitsBillboard = attachment and attachment:FindFirstChild("UnitsBillboard")
+                                                    
                                                     if unitsBillboard and unitsBillboard.Enabled then
                                                         hrp.CFrame = cashPart.CFrame
                                                         task.wait(0.5)
@@ -497,6 +543,69 @@ Tabs.Main:Toggle({
     end
 })
 
+_G.AutoUpgradeSteps = false
+Tabs.Main:Toggle({
+    Title = "Auto Upgrade Health",
+    Value = false,
+    Callback = function(Value)
+        _G.AutoUpgradeSteps = Value
+        if Value then
+            task.spawn(function()
+                local lastBuyTime = tick()
+                local currentDelay = 0.2
+                while _G.AutoUpgradeSteps do
+                    pcall(function()
+                        local boughtAny = false
+                        local LocalPlayer = game:GetService("Players").LocalPlayer
+                        local cashStat = LocalPlayer.leaderstats and LocalPlayer.leaderstats:FindFirstChild("Cash")
+                        local playerCash = cashStat and tonumber(cashStat.Value) or 0
+                        local scrollingFrame = LocalPlayer.PlayerGui.App.Container.Frames.UpgradesImage.ScrollingFrame
+                        
+                        local steps = {"Step500", "Step75", "Step5"}
+                        for _, stepName in ipairs(steps) do
+                            local stepUI = scrollingFrame:FindFirstChild(stepName)
+                            if stepUI then
+                                local btn = stepUI:FindFirstChild("ClaimButton1")
+                                if btn then
+                                    local priceLabel = btn:FindFirstChild("PriceLabel")
+                                    if priceLabel then
+                                        local text = string.gsub(priceLabel.Text, "^%s*(.-)%s*$", "%1")
+                                        if string.lower(text) ~= "max" and string.lower(text) ~= "maxed" then
+                                            local priceStr = string.gsub(text, "[%$%s]", "")
+                                            local price = math.huge
+                                            if NumberConverter and NumberConverter.Parse then
+                                                price = NumberConverter.Parse(priceStr)
+                                            else
+                                                price = tonumber(string.match(priceStr, "[%d%.]+")) or math.huge
+                                            end
+                                            
+                                            if playerCash >= price then
+                                                game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("BuySpeedStepUpgrade"):FireServer(stepName)
+                                                boughtAny = true
+                                                break
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                        
+                        if boughtAny then
+                            lastBuyTime = tick()
+                            currentDelay = 0.2
+                        else
+                            if tick() - lastBuyTime >= 2 then
+                                currentDelay = 2
+                            end
+                        end
+                    end)
+                    task.wait(currentDelay)
+                end
+            end)
+        end
+    end
+})
+
 _G.AutoBuyTrailToggle = false
 Tabs.Main:Toggle({
     Title = "Auto Buy Trail",
@@ -577,6 +686,34 @@ Tabs.Main:Toggle({
                         end
                     end)
                     task.wait(2.5)
+                end
+            end)
+        end
+    end
+})
+
+_G.AutoRebirthBrainrot = false
+Tabs.Main:Toggle({
+    Title = "Auto Rebirth",
+    Value = false,
+    Callback = function(Value)
+        _G.AutoRebirthBrainrot = Value
+        if Value then
+            task.spawn(function()
+                while _G.AutoRebirthBrainrot do
+                    pcall(function()
+                        local LocalPlayer = game:GetService("Players").LocalPlayer
+                        local progressReward = LocalPlayer.PlayerGui.App.Container.Frames.Rebirth.RewardBackground.ProgressReward
+                        if progressReward then
+                            local scaleX = math.floor(progressReward.Size.X.Scale * 1000 + 0.5) / 1000
+                            local scaleY = math.floor(progressReward.Size.Y.Scale * 1000 + 0.5) / 1000
+                            
+                            if scaleX >= 1 and scaleY >= 1 then
+                                game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("RequestRebirth"):FireServer()
+                            end
+                        end
+                    end)
+                    task.wait(1)
                 end
             end)
         end
