@@ -423,7 +423,7 @@ EggSection:Toggle({
                                         local circle = targetEgg:FindFirstChild("Circle")
                                         local targetPart = circle or targetEgg:FindFirstChildWhichIsA("BasePart")
                                         if targetPart then
-                                            hrp.CFrame = targetPart.CFrame
+                                            hrp.CFrame = targetPart.CFrame * CFrame.new(3, 3, 0)
                                         end
                                         
                                         local args = { selectedEgg }
