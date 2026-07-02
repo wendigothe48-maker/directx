@@ -554,7 +554,7 @@ local function scanAccessories()
     local accessoryShop = frames and frames:FindFirstChild("AccessoryShop")
     local scrollingFrame = accessoryShop and accessoryShop:FindFirstChild("ScrollingFrame")
     
-    if not scrollingFrame then return end
+    if not scrollingFrame then return false end
     
     local rawAcc = {}
     for _, child in ipairs(scrollingFrame:GetChildren()) do
@@ -568,7 +568,7 @@ local function scanAccessories()
                 local accName = nameLabel.Text
                 local priceText = priceLabel.Text
                 local priceNum = NumberConverter and NumberConverter.Parse(priceText) or 0
-                local ddName = accName .. " (" .. priceText .. ")"
+                local ddName = child.Name .. " (" .. accName .. ")"
                 
                 table.insert(rawAcc, {
                     Slot = child,
@@ -582,16 +582,35 @@ local function scanAccessories()
         end
     end
     
-    accessoryList = {}
-    accessoryDataMap = {}
+    local newList = {}
+    local newMap = {}
     for _, a in ipairs(rawAcc) do
-        table.insert(accessoryList, a.DropdownName)
-        accessoryDataMap[a.DropdownName] = a
+        table.insert(newList, a.DropdownName)
+        newMap[a.DropdownName] = a
     end
     
-    if #accessoryList == 0 then
-        table.insert(accessoryList, "No accessories found")
+    if #newList == 0 then
+        table.insert(newList, "No accessories found")
     end
+    
+    local changed = false
+    if #newList ~= #accessoryList then
+        changed = true
+    else
+        for i, v in ipairs(newList) do
+            if accessoryList[i] ~= v then
+                changed = true
+                break
+            end
+        end
+    end
+    
+    if changed then
+        accessoryList = newList
+        accessoryDataMap = newMap
+        return true
+    end
+    return false
 end
 
 scanAccessories()
@@ -619,15 +638,17 @@ AccessoryDropdown = UpgradeSection:Dropdown({
     end
 })
 
-UpgradeSection:Button({
-    Title = "Refresh Accessories",
-    Callback = function()
-        scanAccessories()
-        if AccessoryDropdown and AccessoryDropdown.Refresh then
-            AccessoryDropdown:Refresh(accessoryList)
-        end
+task.spawn(function()
+    while task.wait(1) do
+        pcall(function()
+            if scanAccessories() then
+                if AccessoryDropdown and AccessoryDropdown.Refresh then
+                    AccessoryDropdown:Refresh(accessoryList)
+                end
+            end
+        end)
     end
-})
+end)
 
 _G.AutoBuyAccessory = false
 UpgradeSection:Toggle({
@@ -733,11 +754,18 @@ UpgradeSection:Toggle({
                                             
                                             if equipBtn and equipBtn.Visible then
                                                 isOwned = true
-                                                if equipBtn.Text == "Equipped" then
+                                                local eText = ""
+                                                local eLbl = equipBtn:FindFirstChildOfClass("TextLabel")
+                                                if eLbl then eText = eLbl.Text elseif equipBtn:IsA("TextLabel") or equipBtn:IsA("TextButton") then eText = equipBtn.Text end
+                                                
+                                                if eText == "Equipped" then
                                                     isEquipped = true
                                                 end
                                             elseif winsBtn and winsBtn.Visible then
-                                                local pText = winsBtn.Text
+                                                local pText = ""
+                                                local pLbl = winsBtn:FindFirstChildOfClass("TextLabel")
+                                                if pLbl then pText = pLbl.Text elseif winsBtn:IsA("TextLabel") or winsBtn:IsA("TextButton") then pText = winsBtn.Text end
+                                                
                                                 price = NumberConverter and NumberConverter.Parse(pText) or math.huge
                                             end
                                             
