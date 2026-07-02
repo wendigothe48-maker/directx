@@ -63,6 +63,7 @@ Window:Tag({
 
 local Tabs = {
     Main = Window:Tab({ Title = "Main", Icon = "solar:home-bold" }),
+    Shop = Window:Tab({ Title = "Shop", Icon = "solar:cart-large-2-bold" }),
     Movement = Window:Tab({ Title = "Movement", Icon = "solar:running-bold" }),
     Teleport = Window:Tab({ Title = "Teleport", Icon = "solar:map-point-bold" }),
     Settings = Window:Tab({ Title = "Settings", Icon = "solar:settings-bold" }),
@@ -106,9 +107,40 @@ local function fireTouch(part, toPart)
     end
 end
 
+local VirtualInputManager = cloneref(game:GetService("VirtualInputManager"))
+local GuiService = cloneref(game:GetService("GuiService"))
+local UIS = cloneref(game:GetService("UserInputService"))
+
+local function simulateClick(button)
+    if not button then return end
+    if UIS.TouchEnabled and not UIS.MouseEnabled then
+        if button.AbsolutePosition then
+            local x = button.AbsolutePosition.X + (button.AbsoluteSize.X / 2)
+            local y = button.AbsolutePosition.Y + (button.AbsoluteSize.Y / 2) + GuiService:GetGuiInset().Y
+            local mobileTouchId = 55555
+            VirtualInputManager:SendTouchEvent(mobileTouchId, 0, x, y)
+            task.wait(0.02)
+            VirtualInputManager:SendTouchEvent(mobileTouchId, 2, x, y)
+        end
+    else
+        if button.AbsolutePosition then
+            local x = button.AbsolutePosition.X + (button.AbsoluteSize.X / 2)
+            local y = button.AbsolutePosition.Y + (button.AbsoluteSize.Y / 2) + GuiService:GetGuiInset().Y
+            VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 1) -- Left Click Down
+            task.wait(0.02)
+            VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 1) -- Left Click Up
+        end
+    end
+end
+
 -- ══════════════════════════════════════════
 --              MAIN TAB
 -- ══════════════════════════════════════════
+Tabs.Main:Paragraph({
+    Title = "Notice",
+    Desc = "Stage 18 Works After (Game) Update\nYou can try if E109 Shows mean Stage18 Is Still not updated"
+})
+
 local savedVictoryCFrames = {}
 
 local FarmSection = Tabs.Main:Section({
@@ -468,29 +500,306 @@ EggSection:Toggle({
         _G.AutoEquipBest = Value
         if Value then
             task.spawn(function()
-                local lastCount = -1
                 while _G.AutoEquipBest do
                     pcall(function()
+                        local remote = game:GetService("ReplicatedStorage"):FindFirstChild("PetsEquipBest")
+                        if remote then
+                            remote:FireServer()
+                        end
+                    end)
+                    task.wait(5)
+                end
+            end)
+        end
+    end
+})
+
+local UpgradeSection = Tabs.Shop:Section({
+    Title = "Buy & Upgrade",
+    Box = true,
+    BoxBorder = true,
+    Expandable = true,
+    Opened = true
+})
+
+_G.AutoEquipBestAccessory = false
+UpgradeSection:Toggle({
+    Title = "Auto Equip Best Accessory",
+    Value = false,
+    Callback = function(Value)
+        _G.AutoEquipBestAccessory = Value
+        if Value then
+            task.spawn(function()
+                while _G.AutoEquipBestAccessory do
+                    pcall(function()
+                        local remote = game:GetService("ReplicatedStorage"):FindFirstChild("AccessoriesEquipBest")
+                        if remote then
+                            remote:FireServer()
+                        end
+                    end)
+                    task.wait(5)
+                end
+            end)
+        end
+    end
+})
+
+local accessoryList = {"No accessories found"}
+local accessoryDataMap = {}
+local selectedAccessories = {}
+
+local function scanAccessories()
+    local lp = game:GetService("Players").LocalPlayer
+    local frames = lp:FindFirstChild("PlayerGui") and lp.PlayerGui:FindFirstChild("MainUI") and lp.PlayerGui.MainUI:FindFirstChild("Frames")
+    local accessoryShop = frames and frames:FindFirstChild("AccessoryShop")
+    local scrollingFrame = accessoryShop and accessoryShop:FindFirstChild("ScrollingFrame")
+    
+    if not scrollingFrame then return end
+    
+    local rawAcc = {}
+    for _, child in ipairs(scrollingFrame:GetChildren()) do
+        if string.match(child.Name, "^Slot_") then
+            local nameLabel = child:FindFirstChild("NameLabel")
+            local stockLabel = child:FindFirstChild("StockLabel")
+            local purchaseBtn = child:FindFirstChild("RegularPurchaseButton")
+            local priceLabel = purchaseBtn and purchaseBtn:FindFirstChild("CanvasGroup") and purchaseBtn.CanvasGroup:FindFirstChild("TextLabel")
+            
+            if nameLabel and nameLabel:IsA("TextLabel") and priceLabel and priceLabel:IsA("TextLabel") then
+                local accName = nameLabel.Text
+                local priceText = priceLabel.Text
+                local priceNum = NumberConverter and NumberConverter.Parse(priceText) or 0
+                local ddName = accName .. " (" .. priceText .. ")"
+                
+                table.insert(rawAcc, {
+                    Slot = child,
+                    RawName = accName,
+                    PriceNum = priceNum,
+                    PriceText = priceText,
+                    DropdownName = ddName,
+                    Button = purchaseBtn
+                })
+            end
+        end
+    end
+    
+    accessoryList = {}
+    accessoryDataMap = {}
+    for _, a in ipairs(rawAcc) do
+        table.insert(accessoryList, a.DropdownName)
+        accessoryDataMap[a.DropdownName] = a
+    end
+    
+    if #accessoryList == 0 then
+        table.insert(accessoryList, "No accessories found")
+    end
+end
+
+scanAccessories()
+
+local AccessoryDropdown
+AccessoryDropdown = UpgradeSection:Dropdown({
+    Title = "Select Accessories",
+    Multi = true,
+    Values = accessoryList,
+    Value = selectedAccessories,
+    Callback = function(Value)
+        local parsed = {}
+        if type(Value) == "table" then
+            for k, v in pairs(Value) do
+                if type(k) == "number" then
+                    table.insert(parsed, v)
+                elseif v == true then
+                    table.insert(parsed, k)
+                end
+            end
+        elseif type(Value) == "string" then
+            table.insert(parsed, Value)
+        end
+        selectedAccessories = parsed
+    end
+})
+
+UpgradeSection:Button({
+    Title = "Refresh Accessories",
+    Callback = function()
+        scanAccessories()
+        if AccessoryDropdown and AccessoryDropdown.Refresh then
+            AccessoryDropdown:Refresh(accessoryList)
+        end
+    end
+})
+
+_G.AutoBuyAccessory = false
+UpgradeSection:Toggle({
+    Title = "Auto Buy Accessory",
+    Value = false,
+    Callback = function(Value)
+        _G.AutoBuyAccessory = Value
+        if Value then
+            task.spawn(function()
+                while _G.AutoBuyAccessory do
+                    pcall(function()
                         local lp = game:GetService("Players").LocalPlayer
-                        local frames = lp:FindFirstChild("PlayerGui") and lp.PlayerGui:FindFirstChild("MainUI") and lp.PlayerGui.MainUI:FindFirstChild("Frames")
-                        local pets = frames and frames:FindFirstChild("Pets")
-                        local contentFrame = pets and pets:FindFirstChild("ContentFrame")
-                        local main = contentFrame and contentFrame:FindFirstChild("Main")
-                        local nine = main and main:FindFirstChild("9")
+                        local guiWins = lp:FindFirstChild("PlayerGui") and lp.PlayerGui:FindFirstChild("MainUI") and lp.PlayerGui.MainUI:FindFirstChild("Buttons") and lp.PlayerGui.MainUI.Buttons:FindFirstChild("Left") and lp.PlayerGui.MainUI.Buttons.Left:FindFirstChild("Wins") and lp.PlayerGui.MainUI.Buttons.Left.Wins:FindFirstChild("VictoryLabel")
                         
-                        if nine then
-                            local currentCount = #nine:GetChildren()
-                            if lastCount ~= -1 and currentCount ~= lastCount then
-                                local remote = game:GetService("ReplicatedStorage"):FindFirstChild("PetsEquipBest")
-                                if remote then
-                                    remote:FireServer()
+                        local myWins = 0
+                        if guiWins and guiWins:IsA("TextLabel") then
+                            myWins = NumberConverter and NumberConverter.Parse(guiWins.Text) or 0
+                        end
+                        
+                        for _, selName in ipairs(selectedAccessories) do
+                            if not _G.AutoBuyAccessory then break end
+                            local data = accessoryDataMap[selName]
+                            if data and data.Slot and data.Slot.Parent then
+                                local stockLabel = data.Slot:FindFirstChild("StockLabel")
+                                if stockLabel and stockLabel:IsA("TextLabel") then
+                                    local stockText = stockLabel.Text
+                                    local stockNum = tonumber(string.match(stockText, "%d+")) or 0
+                                    
+                                    if stockNum > 0 and myWins >= data.PriceNum then
+                                        local remote = game:GetService("ReplicatedStorage"):FindFirstChild("AccessoryShopBuyWins")
+                                        if remote then
+                                            local slotNumStr = string.match(data.Slot.Name, "Slot_(%d+)")
+                                            local slotNum = tonumber(slotNumStr)
+                                            if slotNum then
+                                                remote:FireServer(slotNum)
+                                                task.wait(0.2)
+                                            end
+                                        end
+                                    end
                                 end
                             end
-                            lastCount = currentCount
                         end
                     end)
                     task.wait(0.5)
                 end
+            end)
+        end
+    end
+})
+
+_G.AutoBuyTrails = false
+UpgradeSection:Toggle({
+    Title = "Auto Buy Trails",
+    Value = false,
+    Callback = function(Value)
+        _G.AutoBuyTrails = Value
+        if Value then
+            print("[AutoBuyTrails] Started")
+            task.spawn(function()
+                while _G.AutoBuyTrails do
+                    local ok, err = pcall(function()
+                        local lp = game:GetService("Players").LocalPlayer
+                        local guiWins = lp:FindFirstChild("PlayerGui") and lp.PlayerGui:FindFirstChild("MainUI") and lp.PlayerGui.MainUI:FindFirstChild("Buttons") and lp.PlayerGui.MainUI.Buttons:FindFirstChild("Left") and lp.PlayerGui.MainUI.Buttons.Left:FindFirstChild("Wins") and lp.PlayerGui.MainUI.Buttons.Left.Wins:FindFirstChild("VictoryLabel")
+                        
+                        local myWins = 0
+                        if guiWins and guiWins:IsA("TextLabel") then
+                            myWins = NumberConverter and NumberConverter.Parse(guiWins.Text) or 0
+                        end
+
+                        print("[AutoBuyTrails] Current Wins: " .. tostring(myWins))
+
+                        local frames = lp:FindFirstChild("PlayerGui") and lp.PlayerGui:FindFirstChild("MainUI") and lp.PlayerGui.MainUI:FindFirstChild("Frames")
+                        local inventory = frames and frames:FindFirstChild("Inventory")
+                        local trails = inventory and inventory:FindFirstChild("Trails")
+                        local scrolling = trails and trails:FindFirstChild("Scrolling")
+
+                        if scrolling then
+                            local bestAffordableTrail = nil
+                            local highestStatAffordable = -1
+                            
+                            local bestEquippedTrail = nil
+                            local highestStatEquipped = -1
+
+                            print("[AutoBuyTrails] Scanning trails...")
+                            for _, child in ipairs(scrolling:GetChildren()) do
+                                if string.match(child.Name, "^Trail%d+") then
+                                    local container = child:FindFirstChild("Container")
+                                    if container then
+                                        local statLabel = container:FindFirstChild("SpeedBoost")
+                                        local buttons = container:FindFirstChild("Buttons")
+                                        
+                                        if statLabel and statLabel:IsA("TextLabel") and buttons then
+                                            local statText = statLabel.Text
+                                            local cleanedStatStr = string.match(statText, "[%d%.]+")
+                                            local statValue = tonumber(cleanedStatStr) or 0
+                                            
+                                            local equipBtn = buttons:FindFirstChild("Equip")
+                                            local winsBtn = buttons:FindFirstChild("Wins")
+                                            
+                                            local isEquipped = false
+                                            local isOwned = false
+                                            local price = math.huge
+                                            
+                                            if equipBtn and equipBtn.Visible then
+                                                isOwned = true
+                                                if equipBtn.Text == "Equipped" then
+                                                    isEquipped = true
+                                                end
+                                            elseif winsBtn and winsBtn.Visible then
+                                                local pText = winsBtn.Text
+                                                price = NumberConverter and NumberConverter.Parse(pText) or math.huge
+                                            end
+                                            
+                                            print(string.format("[AutoBuyTrails] %s | Stat: %s | Owned: %s | Equipped: %s | Price: %s", child.Name, tostring(statValue), tostring(isOwned), tostring(isEquipped), tostring(price)))
+                                            
+                                            if isEquipped then
+                                                if statValue > highestStatEquipped then
+                                                    highestStatEquipped = statValue
+                                                    bestEquippedTrail = child.Name
+                                                end
+                                            end
+                                            
+                                            if isOwned then
+                                                if statValue > highestStatAffordable then
+                                                    highestStatAffordable = statValue
+                                                    bestAffordableTrail = {Name = child.Name, Action = "Equip"}
+                                                end
+                                            elseif price <= myWins then
+                                                if statValue > highestStatAffordable then
+                                                    highestStatAffordable = statValue
+                                                    bestAffordableTrail = {Name = child.Name, Action = "Buy"}
+                                                end
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                            
+                            print("[AutoBuyTrails] Best Equipped Stat: " .. tostring(highestStatEquipped))
+                            if bestAffordableTrail then
+                                print("[AutoBuyTrails] Best Affordable Stat: " .. tostring(highestStatAffordable) .. " | Target: " .. bestAffordableTrail.Name .. " | Action: " .. bestAffordableTrail.Action)
+                                
+                                if highestStatAffordable > highestStatEquipped then
+                                    if bestAffordableTrail.Action == "Equip" then
+                                        print("[AutoBuyTrails] Equipping " .. bestAffordableTrail.Name)
+                                        local remote = game:GetService("ReplicatedStorage"):FindFirstChild("TrailsEquip")
+                                        if remote then
+                                            remote:FireServer(bestAffordableTrail.Name)
+                                        end
+                                    elseif bestAffordableTrail.Action == "Buy" then
+                                        print("[AutoBuyTrails] Buying " .. bestAffordableTrail.Name)
+                                        local remote = game:GetService("ReplicatedStorage"):FindFirstChild("TrailsBuyWins")
+                                        if remote then
+                                            remote:FireServer(bestAffordableTrail.Name)
+                                        end
+                                    end
+                                else
+                                    print("[AutoBuyTrails] Already have the best trail equipped.")
+                                end
+                            else
+                                print("[AutoBuyTrails] No affordable trail found better than equipped.")
+                            end
+                        else
+                            print("[AutoBuyTrails] Scrolling frame not found.")
+                        end
+                    end)
+                    if not ok then
+                        print("[AutoBuyTrails] Error: ", err)
+                    end
+                    task.wait(2.5)
+                end
+                print("[AutoBuyTrails] Stopped")
             end)
         end
     end
