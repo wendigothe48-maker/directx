@@ -210,29 +210,40 @@ MainSection:Toggle({
                         end
 
                         local bestButton = nil
+                        local highestStageNumW2 = -1
+                        local highestStageNumMap = -1
                         
-                        -- FIRST TRY NEW PATH
-                        local w2Button = workspace:FindFirstChild("World2") and 
-                                         workspace.World2:FindFirstChild("Stage9") and 
-                                         workspace.World2.Stage9:FindFirstChild("FinalDestination") and 
-                                         workspace.World2.Stage9.FinalDestination:FindFirstChild("NormalWin") and 
-                                         workspace.World2.Stage9.FinalDestination.NormalWin:FindFirstChild("Button")
+                        local w2 = workspace:FindFirstChild("World2")
+                        if w2 then
+                            for _, stage in ipairs(w2:GetChildren()) do
+                                if string.match(stage.Name, "^Stage(%d+)$") then
+                                    local num = tonumber(string.match(stage.Name, "^Stage(%d+)$"))
+                                    if num and num > highestStageNumW2 then
+                                        local normalWin = (stage:FindFirstChild("FinalDestination") and stage.FinalDestination:FindFirstChild("NormalWin")) or stage:FindFirstChild("NormalWin")
+                                        if normalWin then
+                                            local button = normalWin:FindFirstChild("Button")
+                                            if button and button:IsA("BasePart") then
+                                                highestStageNumW2 = num
+                                                bestButton = button
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end
                         
-                        if w2Button and w2Button:IsA("BasePart") then
-                            bestButton = w2Button
-                        else
-                            local highestStageNum = -1
+                        if not bestButton then
                             local map = workspace:FindFirstChild("Map")
                             if map then
                                 for _, stage in ipairs(map:GetChildren()) do
                                     if string.match(stage.Name, "^Stage(%d+)$") then
                                         local num = tonumber(string.match(stage.Name, "^Stage(%d+)$"))
-                                        if num and num > highestStageNum then
+                                        if num and num > highestStageNumMap then
                                             local normalWin = stage:FindFirstChild("NormalWin")
                                             if normalWin then
                                                 local button = normalWin:FindFirstChild("Button")
                                                 if button and button:IsA("BasePart") then
-                                                    highestStageNum = num
+                                                    highestStageNumMap = num
                                                     bestButton = button
                                                 end
                                             end
