@@ -209,21 +209,32 @@ MainSection:Toggle({
                             vim:SendKeyEvent(true, Enum.KeyCode.W, false, game)
                         end
 
-                        local highestStageNum = -1
                         local bestButton = nil
                         
-                        local map = workspace:FindFirstChild("Map")
-                        if map then
-                            for _, stage in ipairs(map:GetChildren()) do
-                                if string.match(stage.Name, "^Stage(%d+)$") then
-                                    local num = tonumber(string.match(stage.Name, "^Stage(%d+)$"))
-                                    if num and num > highestStageNum then
-                                        local normalWin = stage:FindFirstChild("NormalWin")
-                                        if normalWin then
-                                            local button = normalWin:FindFirstChild("Button")
-                                            if button and button:IsA("BasePart") then
-                                                highestStageNum = num
-                                                bestButton = button
+                        -- FIRST TRY NEW PATH
+                        local w2Button = workspace:FindFirstChild("World2") and 
+                                         workspace.World2:FindFirstChild("Stage9") and 
+                                         workspace.World2.Stage9:FindFirstChild("FinalDestination") and 
+                                         workspace.World2.Stage9.FinalDestination:FindFirstChild("NormalWin") and 
+                                         workspace.World2.Stage9.FinalDestination.NormalWin:FindFirstChild("Button")
+                        
+                        if w2Button and w2Button:IsA("BasePart") then
+                            bestButton = w2Button
+                        else
+                            local highestStageNum = -1
+                            local map = workspace:FindFirstChild("Map")
+                            if map then
+                                for _, stage in ipairs(map:GetChildren()) do
+                                    if string.match(stage.Name, "^Stage(%d+)$") then
+                                        local num = tonumber(string.match(stage.Name, "^Stage(%d+)$"))
+                                        if num and num > highestStageNum then
+                                            local normalWin = stage:FindFirstChild("NormalWin")
+                                            if normalWin then
+                                                local button = normalWin:FindFirstChild("Button")
+                                                if button and button:IsA("BasePart") then
+                                                    highestStageNum = num
+                                                    bestButton = button
+                                                end
                                             end
                                         end
                                     end
@@ -408,6 +419,67 @@ MainSection:Toggle({
     end
 })
 
+_G.AutoEquipBestAura = false
+MainSection:Toggle({
+    Title = "Auto Equip Best Aura",
+    Value = false,
+    Callback = function(Value)
+        _G.AutoEquipBestAura = Value
+        if Value then
+            task.spawn(function()
+                while _G.AutoEquipBestAura do
+                    pcall(function()
+                        local lp = game:GetService("Players").LocalPlayer
+                        local aurasHolder = lp:FindFirstChild("PlayerGui") and lp.PlayerGui:FindFirstChild("Main") and lp.PlayerGui.Main:FindFirstChild("UIs") and lp.PlayerGui.Main.UIs:FindFirstChild("Backpack") and lp.PlayerGui.Main.UIs.Backpack:FindFirstChild("MainAuras") and lp.PlayerGui.Main.UIs.Backpack.MainAuras:FindFirstChild("Holder")
+                        
+                        if aurasHolder then
+                            local bestStat = -1
+                            local bestAura = nil
+                            local equippedStat = -1
+                            
+                            for _, auraFrame in ipairs(aurasHolder:GetChildren()) do
+                                if auraFrame:IsA("GuiObject") then
+                                    local statLabel = findStatLabel(auraFrame)
+                                    local statNum = 0
+                                    if statLabel then
+                                        statNum = CleanAndParse(statLabel.Text or statLabel.ContentText or "0")
+                                    end
+                                    
+                                    local buttons = auraFrame:FindFirstChild("Buttons")
+                                    if buttons then
+                                        local equipBtn = buttons:FindFirstChild("Equip")
+                                        local unequipBtn = buttons:FindFirstChild("Unequip")
+                                        
+                                        if unequipBtn and unequipBtn.Visible then
+                                            equippedStat = statNum
+                                        elseif equipBtn and equipBtn.Visible then
+                                            if statNum > bestStat then
+                                                bestStat = statNum
+                                                bestAura = auraFrame.Name
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                            
+                            if bestAura and bestStat > equippedStat then
+                                local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
+                                if remotes then
+                                    local equipRemote = remotes:FindFirstChild("EquipAura") or remotes:FindFirstChild("EquipAuras")
+                                    if equipRemote then
+                                        equipRemote:FireServer(unpack({bestAura}))
+                                    end
+                                end
+                            end
+                        end
+                    end)
+                    task.wait(2.5)
+                end
+            end)
+        end
+    end
+})
+
 _G.AutoBuyTrails = false
 MainSection:Toggle({
     Title = "Auto Buy Trails",
@@ -538,6 +610,67 @@ MainSection:Toggle({
     end
 })
 
+_G.AutoEquipBestTrails = false
+MainSection:Toggle({
+    Title = "Auto Equip Best Trails",
+    Value = false,
+    Callback = function(Value)
+        _G.AutoEquipBestTrails = Value
+        if Value then
+            task.spawn(function()
+                while _G.AutoEquipBestTrails do
+                    pcall(function()
+                        local lp = game:GetService("Players").LocalPlayer
+                        local trailsHolder = lp:FindFirstChild("PlayerGui") and lp.PlayerGui:FindFirstChild("Main") and lp.PlayerGui.Main:FindFirstChild("UIs") and lp.PlayerGui.Main.UIs:FindFirstChild("Backpack") and lp.PlayerGui.Main.UIs.Backpack:FindFirstChild("MainTrails") and lp.PlayerGui.Main.UIs.Backpack.MainTrails:FindFirstChild("Holder")
+                        
+                        if trailsHolder then
+                            local bestStat = -1
+                            local bestTrail = nil
+                            local equippedStat = -1
+                            
+                            for _, trailFrame in ipairs(trailsHolder:GetChildren()) do
+                                if trailFrame:IsA("GuiObject") then
+                                    local statLabel = findStatLabel(trailFrame)
+                                    local statNum = 0
+                                    if statLabel then
+                                        statNum = CleanAndParse(statLabel.Text or statLabel.ContentText or "0")
+                                    end
+                                    
+                                    local buttons = trailFrame:FindFirstChild("Buttons")
+                                    if buttons then
+                                        local equipBtn = buttons:FindFirstChild("Equip")
+                                        local unequipBtn = buttons:FindFirstChild("Unequip")
+                                        
+                                        if unequipBtn and unequipBtn.Visible then
+                                            equippedStat = statNum
+                                        elseif equipBtn and equipBtn.Visible then
+                                            if statNum > bestStat then
+                                                bestStat = statNum
+                                                bestTrail = trailFrame.Name
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                            
+                            if bestTrail and bestStat > equippedStat then
+                                local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
+                                if remotes then
+                                    local equipRemote = remotes:FindFirstChild("EquipTrail") or remotes:FindFirstChild("EquipTrails")
+                                    if equipRemote then
+                                        equipRemote:FireServer(unpack({bestTrail}))
+                                    end
+                                end
+                            end
+                        end
+                    end)
+                    task.wait(2.5)
+                end
+            end)
+        end
+    end
+})
+
 _G.AutoBuySteps = false
 
 MainSection:Toggle({
@@ -640,6 +773,80 @@ MainSection:Toggle({
 })
 
 
+
+_G.AutoEquipBestSteps = false
+MainSection:Toggle({
+    Title = "Auto Equip Best Steps",
+    Value = false,
+    Callback = function(Value)
+        _G.AutoEquipBestSteps = Value
+        if Value then
+            task.spawn(function()
+                while _G.AutoEquipBestSteps do
+                    pcall(function()
+                        local lp = game:GetService("Players").LocalPlayer
+                        local upgrades = workspace:FindFirstChild("Upgrades")
+                        
+                        if upgrades then
+                            local bestStepPart = nil
+                            local bestStat = -1
+                            local equippedStat = -1
+                            
+                            for _, stepModel in ipairs(upgrades:GetChildren()) do
+                                if stepModel:IsA("Model") or stepModel:IsA("Folder") then
+                                    local button = nil
+                                    for _, child in ipairs(stepModel:GetChildren()) do
+                                        if string.match(child.Name, "^Button") and child:IsA("BasePart") then
+                                            button = child
+                                            break
+                                        end
+                                    end
+                                    
+                                    if button and button:FindFirstChildWhichIsA("TouchTransmitter") then
+                                        local plusStep = stepModel:FindFirstChild("PlusStep")
+                                        if plusStep then
+                                            local billboard = plusStep:FindFirstChild("BillboardGui")
+                                            if billboard then
+                                                local requiredLabel = billboard:FindFirstChild("Required")
+                                                if requiredLabel and requiredLabel:IsA("TextLabel") then
+                                                    local reqText = tostring(requiredLabel.Text or requiredLabel.ContentText or "")
+                                                    reqText = string.gsub(reqText, "[Rr]equired", "")
+                                                    reqText = string.gsub(reqText, "[Rr]e%.%.%.", "")
+                                                    local reqNum = CleanAndParse(reqText)
+                                                    
+                                                    local r = math.floor(button.Color.R * 255 + 0.5)
+                                                    local g = math.floor(button.Color.G * 255 + 0.5)
+                                                    local b = math.floor(button.Color.B * 255 + 0.5)
+                                                    
+                                                    local isEquipped = (r <= 10 and g >= 245 and b <= 10)
+                                                    local isOwned = (r <= 10 and g >= 245 and b >= 245)
+                                                    
+                                                    if isEquipped then
+                                                        equippedStat = reqNum
+                                                    elseif isOwned then
+                                                        if reqNum > bestStat then
+                                                            bestStat = reqNum
+                                                            bestStepPart = button
+                                                        end
+                                                    end
+                                                end
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                            
+                            if bestStepPart and bestStat > equippedStat and lp.Character and lp.Character:FindFirstChild("HumanoidRootPart") then
+                                fireTouch(bestStepPart, lp.Character.HumanoidRootPart)
+                            end
+                        end
+                    end)
+                    task.wait(2.5)
+                end
+            end)
+        end
+    end
+})
 
 MainSection:Button({
     Title = "Remove Kill Parts",
