@@ -23,7 +23,7 @@ else
         windUI_Source = windUI_Source:gsub("([%w_]+)\\.UserInputType%s*==%s*Enum\\.UserInputType\\.MouseMovement", "(%1.UserInputType == Enum.UserInputType.MouseMovement or %1.UserInputType == Enum.UserInputType.Touch)")
         WindUI = loadstring(windUI_Source)()
     end
-end 
+end
 
 local gameName = "Unknown Game"
 pcall(function()
@@ -182,6 +182,20 @@ FarmingSection:Toggle({
                     else
                         local stageModel = workspace:FindFirstChild("Stages") and workspace.Stages:FindFirstChild(stageName)
                         if not stageModel then task.wait(1) continue end
+                        
+                        -- FAKE TP TO BARRIER SO IT LOADS
+                        local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                        if hrp then
+                            local iStages = stageModel:FindFirstChild("Stages")
+                            if iStages then
+                                local anyBarrier = iStages:FindFirstChild("3") or iStages:FindFirstChild("2") or iStages:FindFirstChild("1") or iStages:GetChildren()[1]
+                                if anyBarrier and anyBarrier:IsA("BasePart") then
+                                    hrp.CFrame = anyBarrier.CFrame + Vector3.new(0, 3, 0)
+                                    task.wait(0.2) -- Wait for area to load
+                                end
+                            end
+                        end
+                        
                         local spawnpoints = stageModel:FindFirstChild("Spawnpoints")
                         if spawnpoints then
                             local bestItemVal = -1
