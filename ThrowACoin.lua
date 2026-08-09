@@ -192,8 +192,10 @@ local function GetBestOwnedCoin()
 end
 
 _G.AutoThrow = false
+_G.ThrowLuckMultiplier = 1
+
 MainSection:Toggle({
-    Title = "Auto Throw (2x Luck)",
+    Title = "Auto Throw",
     Value = false,
     Callback = function(Value)
         _G.AutoThrow = Value
@@ -203,7 +205,7 @@ MainSection:Toggle({
                     pcall(function()
                         local bestCoinName = GetBestOwnedCoin()
                         local args = {
-                            2,
+                            _G.ThrowLuckMultiplier,
                             Vector3.new(-1164.7989501953125, 0.7260000109672546, -175.9498291015625),
                             bestCoinName
                         }
@@ -213,6 +215,20 @@ MainSection:Toggle({
                 end
             end)
         end
+    end
+})
+
+MainSection:Slider({
+    Title = "Luck Multiplier",
+    Description = "Select Your Max Possible Luck Multiplier That You Own Like 2x Or 3x",
+    Step = 1,
+    Value = {
+        Min = 1,
+        Max = 5,
+        Default = 1,
+    },
+    Callback = function(Value)
+        _G.ThrowLuckMultiplier = Value
     end
 })
 
